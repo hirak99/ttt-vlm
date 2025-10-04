@@ -4,6 +4,10 @@ import logging
 from typing import Iterator
 
 
+def _sign(x: float) -> int:
+    return 1 if x >= 0 else -1 if x < 0 else 0
+
+
 @dataclasses.dataclass(frozen=True)
 class BoardState:
     xs: int
@@ -113,6 +117,9 @@ class AllStates:
             best_score = None
             for next_state in self.allowed_moves(state):
                 score = self.solve_for_score(next_state)
+                score = (
+                    abs(score) + len(self._all_scores[next_state].best_plays) / 10.0
+                ) * _sign(score)
                 if score != 0:
                     # Reduce in asbsolute value by one.
                     score -= 1 if score > 0 else -1
