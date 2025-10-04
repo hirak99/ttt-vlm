@@ -3,6 +3,16 @@ import functools
 import logging
 from typing import Iterator
 
+# Scoring system.
+# Scores are always positive for X win. Negate to get scores for O win.
+# If the current position is a win.
+_SCORE_WIN = 1000
+# If it takes n moves to win, n times this will be removed from _SCORE_WIN.
+_SCORE_DELAY = -100
+# If there are multiple ways to win, this will be added for each ways.
+# This incentivizes blocking instead of giving up when there are multiple paths for opponent to win.
+_SCORE_NUM_WAYS = 1
+
 
 def _sign(x: float) -> int:
     return 1 if x >= 0 else -1 if x < 0 else 0
@@ -58,8 +68,16 @@ class BoardState:
 
 @dataclasses.dataclass(frozen=True)
 class StateScore:
-    score: int
+    # Score without counting number of ways to win.
+    _base_score: int
+    # All possible plays to achieve the score.
     best_plays: list[BoardState]
+
+    @property
+    def score(self) -> int:
+        return (
+            abs(self._base_score) + (len(self.best_plays) - 1) * _SCORE_NUM_WAYS
+        ) * _sign(self._base_score)
 
 
 class AllStates:
@@ -74,14 +92,14 @@ class AllStates:
                 yield BoardState(new_xs, new_os, not state.x_to_move)
 
     def terminal_score(self, state: BoardState) -> int | None:
-        # +10 if game ended and X has won.
-        # -10 if game ended and O has won.
+        # _SCORE_WIN if game ended and X won.
+        # -_SCORE_WIN if game ended and O won.
         # 0 if game ended and no one has won.
         # None if game has not ended.
         def check_ones(against: int, ones: int) -> bool:
             return ones & against == ones
 
-        for score, occ in [(10, state.xs), (-10, state.os)]:
+        for score, occ in [(_SCORE_WIN, state.xs), (-_SCORE_WIN, state.os)]:
             # Horizontal.
             if (
                 check_ones(occ, 0b111)
@@ -103,11 +121,6 @@ class AllStates:
             return 0
         return None
 
-    # +10 if X has won.
-    # -10 if O has won.
-    # +10 - k if X wins in k moves.
-    # -10 + k if O wins in k moves.
-    # 0 if no one has perfect play.
     def solve_for_score(self, state: BoardState) -> int:
         if state in self._all_scores:
             return self._all_scores[state].score
@@ -117,12 +130,8 @@ class AllStates:
             best_score = None
             for next_state in self.allowed_moves(state):
                 score = self.solve_for_score(next_state)
-                score = (
-                    abs(score) + len(self._all_scores[next_state].best_plays) / 10.0
-                ) * _sign(score)
-                if score != 0:
-                    # Reduce in asbsolute value by one.
-                    score -= 1 if score > 0 else -1
+                score_sign = _sign(score)
+                score = max(0, abs(score) + _SCORE_DELAY) * score_sign
                 # If x_to_play then maximize, if not then minimize.
                 if (
                     best_score is None
@@ -155,10 +164,13 @@ class AllStates:
 
 def __main__():
     all_states = AllStates()
-    # all_states.trace_win(BoardState.from_string("...|...|..."))
+    all_states.trace_win(BoardState.from_string("...|...|..."))
+    # all_states.trace_win(BoardState.from_string(".X.|.O.|..."))
+    # all_states.trace_win(BoardState.from_string("XXO|OOX|XO."))
     # all_states.trace_win(BoardState.from_string("X.X|O..|O.X"))
-    # all_states.trace_win(BoardState.from_string("XO.|.O.|OXX"))
     all_states.trace_win(BoardState.from_string("...|O..|.XX"))
+    all_states.trace_win(BoardState.from_string("X.X|OO.|OXX"))  # -899
+    all_states.trace_win(BoardState.from_string("XX.|OO.|OXX"))  # -900
 
 
 if __name__ == "__main__":
