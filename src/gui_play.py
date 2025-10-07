@@ -1,9 +1,5 @@
 import time
 
-import pandas as pd
-
-# from plotly import figure_factory as ff
-# from plotly import graph_objects as go
 import streamlit as st
 
 # Note: For streamlit codes, a known issue is that relative import at top level is not okay.
@@ -17,7 +13,6 @@ class StApp:
     def __init__(self) -> None:
         board_array = ["."] * 9
         self._boards = [ttt_solver.BoardState.from_array(board_array)]
-        self._moves: list[str] = []
 
         self._evaluator = ttt_evaluator.TttEvaluator()
         self._text_key = str(time.time())
@@ -94,37 +89,10 @@ class StApp:
         with col1:
             if newboard is not None:
                 if st.button("Commit"):
-                    self._moves.append(f"{self._whose_move} at ({text})")
                     self._boards.append(newboard)
                     self._save_state()
                     self._text_key = str(time.time())
                     st.rerun()
-
-        if len(self._boards) > 1:
-            st.divider()
-            st.markdown("Eval History")
-            df = pd.DataFrame(
-                {
-                    "#": list(range(1, len(self._boards) + 1)),
-                    "Move": [""] + self._moves,
-                    "Eval for X": [
-                        ttt_solver.get_instance().solve(x).score / 100
-                        for x in self._boards
-                    ],
-                }
-            )
-            st.dataframe(df, hide_index=True)
-
-        # trace1 = go.Line(
-        #     y=[ttt_solver.get_instance().solve(x).score / 100 for x in self._boards] + [None] * (81 - len(self._boards)),
-        # )
-        # fig = go.Figure(data=[trace1])
-        # fig.update_layout(
-        #     xaxis=dict(title="Moves"),
-        #     yaxis=dict(title="Eval for X", range=[-10, 10]),
-        #     width=500,
-        # )
-        # st.plotly_chart(fig)
 
 
 def _main():
