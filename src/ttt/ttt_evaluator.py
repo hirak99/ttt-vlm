@@ -31,7 +31,10 @@ class TttEvaluator:
             return TttEvaluation.ILLEGAL, "The move does not define valid state."
 
         reason, message = self._evaluate_move_internal(board0, board1)
-        return reason, f"{message} {self.solver.solve(board1).text_analysis()}"
+        if reason != TttEvaluation.ILLEGAL:
+            message = f"{message} {self.solver.solve(board1).text_analysis()}"
+
+        return reason, message
 
     def _evaluate_move_internal(
         self, board0: ttt_solver.BoardState, board1: ttt_solver.BoardState
