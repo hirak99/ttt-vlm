@@ -35,6 +35,10 @@ class BoardState:
     x_to_move: bool
 
     @functools.cached_property
+    def move_count(self) -> int:
+        return bin(self.xs | self.os).count("1")
+
+    @functools.cached_property
     def emptys(self) -> int:
         return 0b111111111 & ~self.xs & ~self.os
 
@@ -98,7 +102,7 @@ class BoardState:
 
 
 @dataclasses.dataclass(frozen=True)
-class BoardIntel:
+class _BoardIntel:
     # Score without counting number of ways to win.
     _base_score: int
     # All possible plays to achieve the score.
@@ -122,10 +126,17 @@ class BoardIntel:
         # Round it to nearest number of moves.
         return (self._base_score + (-_SCORE_DELAY // 2)) // (-_SCORE_DELAY)
 
+    def text_analysis(self) -> str:
+        if self.win_lead == 0:
+            return "Drawn position."
+        else:
+            who = "X" if self.win_lead > 0 else "O"
+            return f"{who} wins in {10 - abs(self.win_lead)} moves."
+
 
 class _TttSolver:
     def __init__(self):
-        self._all_scores: dict[BoardState, BoardIntel] = {}
+        self._all_scores: dict[BoardState, _BoardIntel] = {}
 
     def terminal_score(self, state: BoardState) -> int | None:
         # _SCORE_WIN if game ended and X won.
@@ -180,13 +191,13 @@ class _TttSolver:
                     best_plays.append(next_state)
             solved_score = best_score
         assert solved_score is not None
-        self._all_scores[state] = BoardIntel(solved_score, best_plays)
+        self._all_scores[state] = _BoardIntel(solved_score, best_plays)
         logging.info(
             f"Explored positions: {len(self._all_scores)}, last state: {state.as_string()} score {self._all_scores[state].score}"
         )
         return self._all_scores[state].score
 
-    def solve(self, state: BoardState) -> BoardIntel:
+    def solve(self, state: BoardState) -> _BoardIntel:
         self.solve_for_score(state)
         return self._all_scores[state]
 

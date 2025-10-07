@@ -22,13 +22,6 @@ class TttEvaluator:
     def evaluate_move(
         self, board_str: Sequence[str], board_after_move_str: Sequence[str]
     ) -> tuple[TttEvaluation, str]:
-        # Evaluate the move.
-        # Score based on what is the effective score after move, only if it drops.
-        # Score for this player after the move:
-        #   <= -900: Blunder
-        #   <= -800: Strategic error
-        #   <= -700: Miscalculation
-
         # Change sign to match this player.
         board0 = ttt_solver.BoardState.from_array(board_str)
         try:
@@ -36,6 +29,19 @@ class TttEvaluator:
         except ttt_solver.IllegalBoardState:
             # TODO: Add reasons based on some basic checks on why this move is illegal.
             return TttEvaluation.ILLEGAL, "The move does not define valid state."
+
+        reason, message = self._evaluate_move_internal(board0, board1)
+        return reason, f"{message} {self.solver.solve(board1).text_analysis()}"
+
+    def _evaluate_move_internal(
+        self, board0: ttt_solver.BoardState, board1: ttt_solver.BoardState
+    ) -> tuple[TttEvaluation, str]:
+        # Evaluate the move.
+        # Score based on what is the effective score after move, only if it drops.
+        # Score for this player after the move:
+        #   <= -900: Blunder
+        #   <= -800: Strategic error
+        #   <= -700: Miscalculation
 
         # Check if it is illegal.
         for legal_move in board0.allowed_moves():
@@ -59,18 +65,28 @@ class TttEvaluator:
         win_lead1 = sign * sol1.win_lead
 
         if win_lead0 >= 0:
-            if win_lead0 > 0:
-                # Was winning.
+            # Starting from a winning or drawn position.
                 if win_lead1 < 0:
                     # Now lost.
-                    return (TttEvaluation.BLUNDER, "Hands a won game to the opponent.")
+                    if win_lead0 > 0:
+                        return (TttEvaluation.BLUNDER, "Hands a won game to the opponent.")
+                    else:
+                        return (TttEvaluation.BLUNDER, "Was draw, now opponent wins.")
                 elif win_lead1 == 0:
                     # Now drawn.
-                    return TttEvaluation.BLUNDER, "Lost the certainty of winning."
-                elif win_lead1 < win_lead0 - 1:
-                    # Gave away a shorter win.
-                    return TttEvaluation.GOOD_MOVE, "Good but missed a quicker victory."
-            return TttEvaluation.GOOD_MOVE, "Good move."
+                    if win_lead0 > 0:
+                        return (TttEvaluation.BLUNDER, "Was won, but now only a draw.")
+                    else:
+                        return TttEvaluation.BLUNDER, "Good move. Maintains neutrality."
+                elif win_lead1 > 0:
+                    # Continues winning.
+                    if win_lead1 < win_lead0 - 1:
+                        # Gave away a shorter win.
+                        return TttEvaluation.GOOD_MOVE, "Good but missed a quicker victory."
+                # Note: This may sometimes not be the "best move", depending on forcing.
+                # E.g. (1,1), (3,2) leads to "X..|...|.O.". Then (1,3) is less preferable than (3,1).
+                # That is due to the quirks of eval function. However, we ignore that and call this best.
+                return TttEvaluation.BEST_MOVE, f"Continues to win."
         elif win_lead0 < 0:
             # Evaluation starting from a losing position.
             if win_lead1 < win_lead0 - 1:
@@ -88,7 +104,7 @@ class TttEvaluator:
                     )
                 if win_lead1 <= -7:
                     return TttEvaluation.MISCALCULATION, "Miscalculation"
-            return TttEvaluation.GOOD_MOVE, "Good move"
+            return TttEvaluation.GOOD_MOVE, "Good move, though loss is unavoidable."
         else:
             raise RuntimeError(f"Unexpected value of {win_lead0=}")
 
