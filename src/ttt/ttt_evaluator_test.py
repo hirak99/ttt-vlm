@@ -9,15 +9,15 @@ _TEST_CASES = [
     ),
     (
         ("X..|...|..O", "X.X|...|..O"),
-        (ttt_evaluator.TttEvaluation.BEST_MOVE, "Best move."),
+        (ttt_evaluator.TttEvaluation.BEST_MOVE, "Best move. X wins in 4 moves."),
     ),
     (
         ("X..|...|...", "X.O|...|..."),
-        (ttt_evaluator.TttEvaluation.GOOD_MOVE, "Good move."),
+        (ttt_evaluator.TttEvaluation.BLUNDER, "Was draw, now opponent wins. X wins in 5 moves."),
     ),
     (
         ("X.O|...|...", "X.O|.X.|..."),
-        (ttt_evaluator.TttEvaluation.BLUNDER, "Lost the certainty of winning."),
+        (ttt_evaluator.TttEvaluation.BLUNDER, "Was won, but now only a draw. Drawn position."),
     ),
 ]
 
