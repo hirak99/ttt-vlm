@@ -24,6 +24,11 @@ def _sign(x: float) -> int:
 
 @dataclasses.dataclass(frozen=True)
 class BoardState:
+    """State of a baord.
+
+    Note: Prefer instantiating through the factory methods over direct instantiation.
+    """
+
     xs: int
     os: int
 
@@ -59,8 +64,16 @@ class BoardState:
         """Constructs a partially filled TTT board.
 
         Args:
-            board: List or str of length 9 with X, O or .
+            board: List or str of length 9 with X, O or . Character '|' can be
+                used for separation and will be ignored. For example "XX.|.OX|OOO".
         """
+        if isinstance(board, str):
+            board = board.replace("|", "")
+            if len(board) != 9:
+                raise IllegalBoardState(f"Must be 9 characters long: {board}")
+            if not all(c in "XO." for c in board):
+                raise IllegalBoardState(f"Must be X, O or .: {board}")
+
         xs = 0
         os = 0
         x_count = 0
@@ -76,21 +89,7 @@ class BoardState:
                 raise IllegalBoardState(f"Must be X, O or .: {board}")
         if x_count != o_count and x_count != o_count + 1:
             raise IllegalBoardState(f"X's must be same or more than O's: {board}")
-        return BoardState(xs, os, x_count == o_count)
-
-    @classmethod
-    def from_string(cls, board_str: str) -> "BoardState":
-        """Constructs a partially filled TTT board.
-
-        Args:
-            board: Same format that as_string returns. Example "XX.|.OX|OOO".
-        """
-        board_str = board_str.replace("|", "")
-        if len(board_str) != 9:
-            raise IllegalBoardState(f"Must be 9 characters long: {board_str}")
-        if not all(c in "XO." for c in board_str):
-            raise IllegalBoardState(f"Must be X, O or .: {board_str}")
-        return BoardState.from_array(list(board_str))
+        return cls(xs, os, x_count == o_count)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -108,8 +107,18 @@ class BoardIntel:
             + max(0, len(self.best_plays) - 1) * _SCORE_NUM_WAYS
         ) * _sign(self._base_score)
 
+    @functools.cached_property
+    def win_lead(self) -> int:
+        # 0 indicates no win in sight.
+        # +10 or -10 indicates X or O has won.
+        # Any other number indicates X or O will win in (10 - abs(n)) moves.
+        assert _SCORE_DELAY < 0
+        # Base score is approximately 100 * what we want. The 100 is -_SCORE_DELAY.
+        # Round it to nearest number of moves.
+        return (self._base_score + (-_SCORE_DELAY // 2)) // (-_SCORE_DELAY)
 
-class TttSolver:
+
+class _TttSolver:
     def __init__(self):
         self._all_scores: dict[BoardState, BoardIntel] = {}
 
@@ -172,6 +181,14 @@ class TttSolver:
         )
         return self._all_scores[state].score
 
+    def solve(self, state: BoardState) -> BoardIntel:
+        self.solve_for_score(state)
+        return self._all_scores[state]
+
+    def best_moves(self, state: BoardState) -> list[BoardState]:
+        self.solve_for_score(state)
+        return self._all_scores[state].best_plays
+
     def trace_win(self, state: BoardState) -> None:
         self.solve_for_score(state)
         print(f"Starting trace for: {state.as_string()}")
@@ -185,15 +202,19 @@ class TttSolver:
             state = best_plays[0]
 
 
+def get_instance() -> _TttSolver:
+    return _TttSolver()
+
+
 def __main__():
-    all_states = TttSolver()
-    all_states.trace_win(BoardState.from_string("...|...|..."))
-    # all_states.trace_win(BoardState.from_string(".X.|.O.|..."))
-    # all_states.trace_win(BoardState.from_string("XXO|OOX|XO."))
-    all_states.trace_win(BoardState.from_string("X..|...|..O"))
-    # all_states.trace_win(BoardState.from_string("...|O..|.XX")) # -501
-    # all_states.trace_win(BoardState.from_string("X.X|OO.|OXX"))  # -900
-    # all_states.trace_win(BoardState.from_string("XX.|OO.|OXX"))  # -901
+    solver = get_instance()
+    solver.trace_win(BoardState.from_array("...|...|..."))
+    # all_states.trace_win(BoardState.from_array(".X.|.O.|..."))
+    # all_states.trace_win(BoardState.from_array("XXO|OOX|XO."))
+    solver.trace_win(BoardState.from_array("X..|...|..O"))
+    # all_states.trace_win(BoardState.from_array("...|O..|.XX")) # -501
+    # all_states.trace_win(BoardState.from_array("X.X|OO.|OXX"))  # -900
+    # all_states.trace_win(BoardState.from_array("XX.|OO.|OXX"))  # -901
 
 
 if __name__ == "__main__":
