@@ -45,8 +45,8 @@ class BoardState:
                 new_os = self.os | (1 << n) if not self.x_to_move else self.os
                 yield BoardState(new_xs, new_os, not self.x_to_move)
 
-    def as_string(self) -> str:
-        # Returns XX.|.OX|OOO
+    def as_array(self) -> list[str]:
+        # Returns ['X', 'X', '.', '.', 'O', 'X', 'O', 'O', 'O'].
         board: list[str] = []
         for n in range(9):
             if self.xs & (1 << n):
@@ -55,8 +55,13 @@ class BoardState:
                 board.append("O")
             else:
                 board.append(".")
-            if n < 8 and (n + 1) % 3 == 0:
-                board.append("|")
+        return board
+
+    def as_string(self) -> str:
+        # Returns XX.|.OX|OOO
+        board: list[str] = self.as_array()
+        board.insert(6, "|")
+        board.insert(3, "|")
         return "".join(board)
 
     @classmethod
