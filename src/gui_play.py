@@ -2,6 +2,9 @@ import time
 
 import streamlit as st
 
+# Note: For streamlit codes, a known issue is that relative import at top level is not okay.
+# So we cannot say `from .ttt import ...`.
+# See: https://discuss.streamlit.io/t/how-to-import-a-module-from-a-parent-directory-in-a-streamlit-project/59016/4
 from ttt import ttt_evaluator
 from ttt import ttt_solver
 
@@ -17,7 +20,7 @@ class StApp:
     @property
     def _whose_move(self) -> str:
         x_or_o = "X" if self._board.x_to_move else "O"
-        return f"'{x_or_o}'"
+        return f"`{x_or_o}`"
 
     def _eval(self, text: str) -> ttt_solver.BoardState | None:
         try:
@@ -30,7 +33,7 @@ class StApp:
             array[(r - 1) * 3 + (c - 1)] = "X" if self._board.x_to_move else "O"
             status, message = self._evaluator.evaluate_move(array_orig, array)
             st.write(f"Evaluation for {self._whose_move} at ({r}, {c}) -")
-            st.write(f"- Status: {status.name}")
+            st.write(f"- Evaluation: {status.name}")
             st.write(f"- Explanation: {message}")
             return ttt_solver.BoardState.from_array(array)
         except (ValueError, IndexError):
@@ -43,14 +46,23 @@ class StApp:
 
     def run(self):
         st.title("Tic Tac Toe Evaluator Demo")
-        st.write(f"Move {self._board.move_count + 1} ({self._whose_move} to move)")
+
+        st.text(
+            "Purpose of this demo is to show how ttt moves played by an AI will be evaluated and categorized. "
+            "To use it, enter tic-tac-toe moves, and notice the evaluations on the right as you play."
+        )
+
+        st.divider()
 
         if st.button("Reset"):
             st.session_state.clear()
             st.rerun()
 
+
         col1, col2 = st.columns(2)
         with col1:
+            st.write(f"Move {self._board.move_count + 1}, {self._whose_move} to move.")
+
             board_out: list[str] = ["```"]
             board_out.append("   1 2 3")
             for index, line in enumerate(self._board.as_string().split("|")):
@@ -59,7 +71,7 @@ class StApp:
             board_out.append("```")
             st.write("\n".join(board_out))
 
-            text = st.text_input(f"Your move (example 1,2):", key=self._text_key)
+            text = st.text_input(f"Enter move (example 1,2):", key=self._text_key)
 
         with col2:
             newboard: ttt_solver.BoardState | None = None
