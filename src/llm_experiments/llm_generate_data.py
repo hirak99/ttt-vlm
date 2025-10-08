@@ -28,6 +28,8 @@ class LLMResult(pydantic.BaseModel):
     ai_whose_move: str | None = None
     # AI's move.
     ai_move: list[str] | None = None
+    # How long it took for the AI to get the result.
+    duration_ms: int
 
 
 class _RandomBoardGen:
@@ -83,7 +85,9 @@ class _LlmEvaluator:
             'Omit "updated_board" if game has ended.',
         ]
         prompt = "\n".join(prompt_lines)
+        start_time = time.time()
         response_json = llm_instance.do_prompt(prompt, max_tokens=1024)
+        duration_ms = int((time.time() - start_time) * 1000)
 
         response = json.loads(response_json)
 
@@ -93,6 +97,7 @@ class _LlmEvaluator:
             ai_model=llm_instance.model_description(),
             ai_whose_move=response.get("whose_move"),
             ai_move=response.get("updated_board"),
+            duration_ms=duration_ms,
         )
 
         # Create log dir if it does not exist.
@@ -107,6 +112,7 @@ class _LlmEvaluator:
 
 def _generate_data(count: int):
     llm_instance = llm.OpenAiLlmInstance("gpt-4.1")
+    # llm_instance = llm.OpenAiLlmInstance("o3")
     tester = _LlmEvaluator()
     for _ in range(count):
         tester.generate(llm_instance)

@@ -159,7 +159,7 @@ class OpenAiLlmInstance(abstract_llm.AbstractLlm):
             client=self._client,
             max_completion_tokens=max_tokens,
             model=self.model_id,
-            messages=[{"role": "user", "content": prompt}],
+            prompt=prompt,
         )
 
 
