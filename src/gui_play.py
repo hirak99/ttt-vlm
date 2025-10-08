@@ -23,8 +23,7 @@ class StApp:
 
     @property
     def _whose_move(self) -> str:
-        x_or_o = "X" if self._board.x_to_move else "O"
-        return f"`{x_or_o}`"
+        return "X" if self._board.x_to_move else "O"
 
     def _eval(self, text: str) -> ttt_solver.BoardState | None:
         try:
@@ -34,9 +33,9 @@ class StApp:
                 return
             array_orig = self._board.as_array()
             array = array_orig.copy()
-            array[(r - 1) * 3 + (c - 1)] = "X" if self._board.x_to_move else "O"
+            array[(r - 1) * 3 + (c - 1)] = self._whose_move
             status, message = self._evaluator.evaluate_move(array_orig, array)
-            st.write(f"Evaluation for {self._whose_move} at ({r}, {c}) -")
+            st.write(f"Evaluation for `{self._whose_move}` at ({r}, {c}) -")
             st.write(f"- Evaluation: {status.name}")
             st.write(f"- Explanation: {message}")
             return ttt_solver.BoardState.from_array(array)
@@ -69,7 +68,7 @@ class StApp:
 
         col1, col2 = st.columns(2)
         with col1:
-            st.write(f"Move {self._board.move_count + 1}, {self._whose_move} to move.")
+            st.write(f"Move {self._board.move_count + 1}, `{self._whose_move}` to move.")
 
             board_out: list[str] = ["```"]
             board_out.append("   1 2 3")
