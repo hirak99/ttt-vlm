@@ -2,7 +2,7 @@ import dataclasses
 import functools
 import logging
 
-from ttt import ttt_board
+from . import ttt_board
 
 # Scoring system.
 # Scores are always positive for X win. Negate to get scores for O win.

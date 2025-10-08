@@ -1,8 +1,6 @@
 import dataclasses
 import unittest
 
-import ttt.ttt_board
-
 from . import ttt_board
 from . import ttt_solver
 
@@ -53,7 +51,9 @@ _EXPECTED_RESULTS = [
     _Expect(board_str="X.O|...|..O", score=None, win_lead=None, best_moves=set()),
     _Expect(board_str="X.X|...|..O", score=601, win_lead=6, best_moves={"XOX|...|..O"}),
     _Expect(board_str="X.O|.X.|...", score=0, win_lead=0, best_moves={"X.O|.X.|..O"}),
-    _Expect(board_str='X.O|X.O|.X.', score=-900, win_lead=-9, best_moves={'X.O|X.O|.XO'})
+    _Expect(
+        board_str="X.O|X.O|.X.", score=-900, win_lead=-9, best_moves={"X.O|X.O|.XO"}
+    ),
 ]
 
 
@@ -65,7 +65,7 @@ class TttSolverTest(unittest.TestCase):
         for board_str, expected_result in zip(_BOARDS, _EXPECTED_RESULTS):
             results.append(_Expect(board_str))
             try:
-                board = ttt.ttt_board.BoardState.from_array(board_str)
+                board = ttt_board.BoardState.from_array(board_str)
             except ttt_board.IllegalBoardState:
                 continue
             intel = solver.solve(board)

@@ -1,8 +1,6 @@
 import enum
 from typing import Sequence
 
-import ttt.ttt_board
-
 from . import ttt_board
 from . import ttt_solver
 
@@ -26,9 +24,9 @@ class TttEvaluator:
         self, board_str: Sequence[str], board_after_move_str: Sequence[str]
     ) -> tuple[TttEvaluation, str]:
         # Change sign to match this player.
-        board0 = ttt.ttt_board.BoardState.from_array(board_str)
+        board0 = ttt_board.BoardState.from_array(board_str)
         try:
-            board1 = ttt.ttt_board.BoardState.from_array(board_after_move_str)
+            board1 = ttt_board.BoardState.from_array(board_after_move_str)
         except ttt_board.IllegalBoardState:
             # TODO: Add reasons based on some basic checks on why this move is illegal.
             return TttEvaluation.ILLEGAL, "The move does not define valid state."
@@ -40,7 +38,7 @@ class TttEvaluator:
         return reason, message
 
     def _evaluate_move_internal(
-        self, board0: ttt.ttt_board.BoardState, board1: ttt.ttt_board.BoardState
+        self, board0: ttt_board.BoardState, board1: ttt_board.BoardState
     ) -> tuple[TttEvaluation, str]:
         # Evaluate the move.
         # Score based on what is the effective score after move, only if it drops.
@@ -72,27 +70,27 @@ class TttEvaluator:
 
         if win_lead0 >= 0:
             # Starting from a winning or drawn position.
-                if win_lead1 < 0:
-                    # Now lost.
-                    if win_lead0 > 0:
-                        return (TttEvaluation.BLUNDER, "Hands a won game to the opponent.")
-                    else:
-                        return (TttEvaluation.BLUNDER, "Was draw, now opponent wins.")
-                elif win_lead1 == 0:
-                    # Now drawn.
-                    if win_lead0 > 0:
-                        return (TttEvaluation.BLUNDER, "Was won, but now only a draw.")
-                    else:
-                        return TttEvaluation.BLUNDER, "Good move. Maintains neutrality."
-                elif win_lead1 > 0:
-                    # Continues winning.
-                    if win_lead1 < win_lead0 - 1:
-                        # Gave away a shorter win.
-                        return TttEvaluation.GOOD_MOVE, "Good but missed a quicker victory."
-                # Note: This may sometimes not be the "best move", depending on forcing.
-                # E.g. (1,1), (3,2) leads to "X..|...|.O.". Then (1,3) is less preferable than (3,1).
-                # That is due to the quirks of eval function. However, we ignore that and call this best.
-                return TttEvaluation.BEST_MOVE, f"Continues to win."
+            if win_lead1 < 0:
+                # Now lost.
+                if win_lead0 > 0:
+                    return (TttEvaluation.BLUNDER, "Hands a won game to the opponent.")
+                else:
+                    return (TttEvaluation.BLUNDER, "Was draw, now opponent wins.")
+            elif win_lead1 == 0:
+                # Now drawn.
+                if win_lead0 > 0:
+                    return (TttEvaluation.BLUNDER, "Was won, but now only a draw.")
+                else:
+                    return TttEvaluation.BLUNDER, "Good move. Maintains neutrality."
+            elif win_lead1 > 0:
+                # Continues winning.
+                if win_lead1 < win_lead0 - 1:
+                    # Gave away a shorter win.
+                    return TttEvaluation.GOOD_MOVE, "Good but missed a quicker victory."
+            # Note: This may sometimes not be the "best move", depending on forcing.
+            # E.g. (1,1), (3,2) leads to "X..|...|.O.". Then (1,3) is less preferable than (3,1).
+            # That is due to the quirks of eval function. However, we ignore that and call this best.
+            return TttEvaluation.BEST_MOVE, f"Continues to win."
         elif win_lead0 < 0:
             # Evaluation starting from a losing position.
             if win_lead1 < win_lead0 - 1:
@@ -117,7 +115,7 @@ class TttEvaluator:
 
 def _main():
     solver = ttt_solver.get_instance()
-    solver.trace_win(ttt.ttt_board.BoardState.from_array("X..|...|..O"))
+    solver.trace_win(ttt_board.BoardState.from_array("X..|...|..O"))
 
     evaluator = TttEvaluator()
     for board, board_after_move in [
