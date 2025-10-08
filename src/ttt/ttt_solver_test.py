@@ -1,6 +1,9 @@
 import dataclasses
 import unittest
 
+import ttt.ttt_board
+
+from . import ttt_board
 from . import ttt_solver
 
 
@@ -62,8 +65,8 @@ class TttSolverTest(unittest.TestCase):
         for board_str, expected_result in zip(_BOARDS, _EXPECTED_RESULTS):
             results.append(_Expect(board_str))
             try:
-                board = ttt_solver.BoardState.from_array(board_str)
-            except ttt_solver.IllegalBoardState:
+                board = ttt.ttt_board.BoardState.from_array(board_str)
+            except ttt_board.IllegalBoardState:
                 continue
             intel = solver.solve(board)
             # This resets the entered board. The idea is to also check

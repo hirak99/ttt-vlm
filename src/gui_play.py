@@ -5,27 +5,27 @@ import streamlit as st
 # Note: For streamlit codes, a known issue is that relative import at top level is not okay.
 # So we cannot say `from .ttt import ...`.
 # See: https://discuss.streamlit.io/t/how-to-import-a-module-from-a-parent-directory-in-a-streamlit-project/59016/4
+from ttt import ttt_board
 from ttt import ttt_evaluator
-from ttt import ttt_solver
 
 
 class StApp:
     def __init__(self) -> None:
         board_array = ["."] * 9
-        self._boards = [ttt_solver.BoardState.from_array(board_array)]
+        self._boards = [ttt_board.BoardState.from_array(board_array)]
 
         self._evaluator = ttt_evaluator.TttEvaluator()
         self._text_key = str(time.time())
 
     @property
-    def _board(self) -> ttt_solver.BoardState:
+    def _board(self) -> ttt_board.BoardState:
         return self._boards[-1]
 
     @property
     def _whose_move(self) -> str:
         return "X" if self._board.x_to_move else "O"
 
-    def _eval(self, text: str) -> ttt_solver.BoardState | None:
+    def _eval(self, text: str) -> ttt_board.BoardState | None:
         try:
             r, c = [int(x) for x in text.split(",")]
             if r < 1 or r > 3 or c < 1 or c > 3:
@@ -38,10 +38,10 @@ class StApp:
             st.write(f"Evaluation for `{self._whose_move}` at ({r}, {c}) -")
             st.write(f"- Evaluation: {status.name}")
             st.write(f"- Explanation: {message}")
-            return ttt_solver.BoardState.from_array(array)
+            return ttt_board.BoardState.from_array(array)
         except (ValueError, IndexError):
             st.write("Invalid input")
-        except ttt_solver.IllegalBoardState:
+        except ttt_board.IllegalBoardState:
             st.write("Illegal move")
 
     def _save_state(self):
@@ -68,7 +68,9 @@ class StApp:
 
         col1, col2 = st.columns(2)
         with col1:
-            st.write(f"Move {self._board.move_count + 1}, `{self._whose_move}` to move.")
+            st.write(
+                f"Move {self._board.move_count + 1}, `{self._whose_move}` to move."
+            )
 
             board_out: list[str] = ["```"]
             board_out.append("   1 2 3")
@@ -81,7 +83,7 @@ class StApp:
             text = st.text_input(f"Enter move (example 1,2):", key=self._text_key)
 
         with col2:
-            newboard: ttt_solver.BoardState | None = None
+            newboard: ttt_board.BoardState | None = None
             if text:
                 newboard = self._eval(text)
 

@@ -1,7 +1,8 @@
 import dataclasses
 import functools
 import logging
-from typing import Iterator, Sequence
+
+from ttt import ttt_board
 
 # Scoring system.
 # Scores are always positive for X win. Negate to get scores for O win.
@@ -14,91 +15,8 @@ _SCORE_DELAY = -100
 _SCORE_NUM_WAYS = 1
 
 
-class IllegalBoardState(Exception):
-    pass
-
-
 def _sign(x: float) -> int:
     return 1 if x >= 0 else -1 if x < 0 else 0
-
-
-@dataclasses.dataclass(frozen=True)
-class BoardState:
-    """State of a baord.
-
-    Note: Prefer instantiating through the factory methods over direct instantiation.
-    """
-
-    xs: int
-    os: int
-
-    x_to_move: bool
-
-    @functools.cached_property
-    def move_count(self) -> int:
-        return bin(self.xs | self.os).count("1")
-
-    @functools.cached_property
-    def emptys(self) -> int:
-        return 0b111111111 & ~self.xs & ~self.os
-
-    def allowed_moves(self) -> Iterator["BoardState"]:
-        for n in range(9):
-            if self.emptys & (1 << n):
-                new_xs = self.xs | (1 << n) if self.x_to_move else self.xs
-                new_os = self.os | (1 << n) if not self.x_to_move else self.os
-                yield BoardState(new_xs, new_os, not self.x_to_move)
-
-    def as_array(self) -> list[str]:
-        # Returns ['X', 'X', '.', '.', 'O', 'X', 'O', 'O', 'O'].
-        board: list[str] = []
-        for n in range(9):
-            if self.xs & (1 << n):
-                board.append("X")
-            elif self.os & (1 << n):
-                board.append("O")
-            else:
-                board.append(".")
-        return board
-
-    def as_string(self) -> str:
-        # Returns XX.|.OX|OOO
-        board: list[str] = self.as_array()
-        board.insert(6, "|")
-        board.insert(3, "|")
-        return "".join(board)
-
-    @classmethod
-    def from_array(cls, board: Sequence[str]) -> "BoardState":
-        """Constructs a partially filled TTT board.
-
-        Args:
-            board: List or str of length 9 with X, O or . Character '|' can be
-                used for separation and will be ignored. For example "XX.|.OX|OOO".
-        """
-        if isinstance(board, str):
-            board = board.replace("|", "")
-            if len(board) != 9:
-                raise IllegalBoardState(f"Must be 9 characters long: {board}")
-            if not all(c in "XO." for c in board):
-                raise IllegalBoardState(f"Must be X, O or .: {board}")
-
-        xs = 0
-        os = 0
-        x_count = 0
-        o_count = 0
-        for n, c in enumerate(board):
-            if c == "X":
-                xs |= 1 << n
-                x_count += 1
-            elif c == "O":
-                os |= 1 << n
-                o_count += 1
-            elif c != ".":
-                raise IllegalBoardState(f"Must be X, O or .: {board}")
-        if x_count != o_count and x_count != o_count + 1:
-            raise IllegalBoardState(f"X's must be same or more than O's: {board}")
-        return cls(xs, os, x_count == o_count)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -106,7 +24,7 @@ class _BoardIntel:
     # Score without counting number of ways to win.
     _base_score: int
     # All possible plays to achieve the score.
-    best_plays: list[BoardState]
+    best_plays: list[ttt_board.BoardState]
 
     @property
     def score(self) -> int:
@@ -136,9 +54,9 @@ class _BoardIntel:
 
 class _TttSolver:
     def __init__(self):
-        self._all_scores: dict[BoardState, _BoardIntel] = {}
+        self._all_scores: dict[ttt_board.BoardState, _BoardIntel] = {}
 
-    def terminal_score(self, state: BoardState) -> int | None:
+    def terminal_score(self, state: ttt_board.BoardState) -> int | None:
         # _SCORE_WIN if game ended and X won.
         # -_SCORE_WIN if game ended and O won.
         # 0 if game ended and no one has won.
@@ -168,11 +86,11 @@ class _TttSolver:
             return 0
         return None
 
-    def solve_for_score(self, state: BoardState) -> int:
+    def solve_for_score(self, state: ttt_board.BoardState) -> int:
         if state in self._all_scores:
             return self._all_scores[state].score
         solved_score = self.terminal_score(state)
-        best_plays: list[BoardState] = []
+        best_plays: list[ttt_board.BoardState] = []
         if solved_score is None:
             best_score = None
             for next_state in state.allowed_moves():
@@ -197,15 +115,15 @@ class _TttSolver:
         )
         return self._all_scores[state].score
 
-    def solve(self, state: BoardState) -> _BoardIntel:
+    def solve(self, state: ttt_board.BoardState) -> _BoardIntel:
         self.solve_for_score(state)
         return self._all_scores[state]
 
-    def best_moves(self, state: BoardState) -> list[BoardState]:
+    def best_moves(self, state: ttt_board.BoardState) -> list[ttt_board.BoardState]:
         self.solve_for_score(state)
         return self._all_scores[state].best_plays
 
-    def trace_win(self, state: BoardState) -> None:
+    def trace_win(self, state: ttt_board.BoardState) -> None:
         self.solve_for_score(state)
         print(f"Starting trace for: {state.as_string()}")
         while True:
@@ -224,13 +142,13 @@ def get_instance() -> _TttSolver:
 
 def __main__():
     solver = get_instance()
-    solver.trace_win(BoardState.from_array("...|...|..."))
-    # all_states.trace_win(BoardState.from_array(".X.|.O.|..."))
-    # all_states.trace_win(BoardState.from_array("XXO|OOX|XO."))
-    solver.trace_win(BoardState.from_array("X..|...|..O"))
-    # all_states.trace_win(BoardState.from_array("...|O..|.XX")) # -501
-    # all_states.trace_win(BoardState.from_array("X.X|OO.|OXX"))  # -900
-    # all_states.trace_win(BoardState.from_array("XX.|OO.|OXX"))  # -901
+    solver.trace_win(ttt_board.BoardState.from_array("...|...|..."))
+    # all_states.trace_win(ttt_board.BoardState.from_array(".X.|.O.|..."))
+    # all_states.trace_win(ttt_board.BoardState.from_array("XXO|OOX|XO."))
+    solver.trace_win(ttt_board.BoardState.from_array("X..|...|..O"))
+    # all_states.trace_win(ttt_board.BoardState.from_array("...|O..|.XX")) # -501
+    # all_states.trace_win(ttt_board.BoardState.from_array("X.X|OO.|OXX"))  # -900
+    # all_states.trace_win(ttt_board.BoardState.from_array("XX.|OO.|OXX"))  # -901
 
 
 if __name__ == "__main__":

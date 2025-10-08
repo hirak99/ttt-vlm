@@ -1,6 +1,9 @@
 import enum
 from typing import Sequence
 
+import ttt.ttt_board
+
+from . import ttt_board
 from . import ttt_solver
 
 
@@ -23,10 +26,10 @@ class TttEvaluator:
         self, board_str: Sequence[str], board_after_move_str: Sequence[str]
     ) -> tuple[TttEvaluation, str]:
         # Change sign to match this player.
-        board0 = ttt_solver.BoardState.from_array(board_str)
+        board0 = ttt.ttt_board.BoardState.from_array(board_str)
         try:
-            board1 = ttt_solver.BoardState.from_array(board_after_move_str)
-        except ttt_solver.IllegalBoardState:
+            board1 = ttt.ttt_board.BoardState.from_array(board_after_move_str)
+        except ttt_board.IllegalBoardState:
             # TODO: Add reasons based on some basic checks on why this move is illegal.
             return TttEvaluation.ILLEGAL, "The move does not define valid state."
 
@@ -37,7 +40,7 @@ class TttEvaluator:
         return reason, message
 
     def _evaluate_move_internal(
-        self, board0: ttt_solver.BoardState, board1: ttt_solver.BoardState
+        self, board0: ttt.ttt_board.BoardState, board1: ttt.ttt_board.BoardState
     ) -> tuple[TttEvaluation, str]:
         # Evaluate the move.
         # Score based on what is the effective score after move, only if it drops.
@@ -114,7 +117,7 @@ class TttEvaluator:
 
 def _main():
     solver = ttt_solver.get_instance()
-    solver.trace_win(ttt_solver.BoardState.from_array("X..|...|..O"))
+    solver.trace_win(ttt.ttt_board.BoardState.from_array("X..|...|..O"))
 
     evaluator = TttEvaluator()
     for board, board_after_move in [
