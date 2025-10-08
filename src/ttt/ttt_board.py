@@ -7,7 +7,7 @@ class IllegalBoardState(Exception):
     pass
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class BoardState:
     """State of a baord.
 
