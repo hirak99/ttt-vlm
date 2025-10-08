@@ -16,18 +16,23 @@ _DATA_DIR = pathlib.Path("_data")
 
 _RANDOM_BOARDS_SEED: int | None = None
 
+# This should be whose_move if AI thinks the game ended.
+_ENDED = "ended"
+
 
 class LLMResult(pydantic.BaseModel):
     # Original position.
     board: str
     # When the query was run up to seconds.
     timestamp: int
+    # Populated if there was error in response like illegal JSON.
+    error: str
     # Model used for the LLM.
     ai_model: str
     # AI guessing whose move.
-    ai_whose_move: str | None = None
-    # AI's move.
-    ai_move: list[str] | None = None
+    ai_whose_move: str
+    # AI's move. None if the move is not there because game ended.
+    ai_move: list[str] | None
     # How long it took for the AI to get the result.
     duration_ms: int
 
@@ -43,7 +48,7 @@ class _RandomBoardGen:
 
     def _random_board_or_none(self) -> ttt_board.BoardState | None:
         board = ttt_board.BoardState.from_array(["."] * 9)
-        num_moves = self._rng.randint(0, 6)
+        num_moves = self._rng.randint(1, 6)
         for _ in range(num_moves):
             moves = list(board.allowed_moves())
             if not moves:
@@ -79,7 +84,7 @@ class _LlmEvaluator:
             "---",
             "Your output must be a valid json of the following format -",
             "{",
-            '  "whose_move": "X" or "O" or "ended",',
+            f'  "whose_move": "X" or "O" or "{_ENDED}",',
             '  "updated_board": [UPDATED_BOARD_AFTER_MOVE]',
             "}",
             'Omit "updated_board" if game has ended.',
@@ -89,14 +94,43 @@ class _LlmEvaluator:
         response_json = llm_instance.do_prompt(prompt, max_tokens=1024)
         duration_ms = int((time.time() - start_time) * 1000)
 
-        response = json.loads(response_json)
+        # Default values if there is any error.
+        ai_whose_move: str = ""
+        ai_move: list[str] | None = None
+        # Check for all kinds of errors.
+        error = ""
+        try:
+            response = json.loads(response_json)
+            if not isinstance(response, dict):
+                error = "response is not dict"
+            else:
+                if "whose_move" not in response:
+                    error = "whose_move not in response"
+                else:
+                    whose_move = response["whose_move"]
+                    if isinstance(whose_move, str):
+                        ai_whose_move = whose_move
+                    else:
+                        error = "whose_move is not str"
+                if "updated_board" in response:
+                    updated_board = response["updated_board"]
+                    if isinstance(updated_board, list) and all(
+                        isinstance(x, str) for x in updated_board
+                    ):
+                        ai_move = updated_board
+                    else:
+                        error = "updated_board is not list"
+
+        except json.JSONDecodeError:
+            error = "illegal JSON"
 
         result = LLMResult(
             board=board.as_string(),
             timestamp=int(time.time()),
+            error=error,
             ai_model=llm_instance.model_description(),
-            ai_whose_move=response.get("whose_move"),
-            ai_move=response.get("updated_board"),
+            ai_whose_move=ai_whose_move,
+            ai_move=ai_move,
             duration_ms=duration_ms,
         )
 
@@ -111,8 +145,9 @@ class _LlmEvaluator:
 
 
 def _generate_data(count: int):
-    llm_instance = llm.OpenAiLlmInstance("gpt-4.1")
+    # llm_instance = llm.OpenAiLlmInstance("gpt-4.1")
     # llm_instance = llm.OpenAiLlmInstance("o3")
+    llm_instance = llm.OpenAiLlmInstance("gpt-3.5-turbo")
     tester = _LlmEvaluator()
     for _ in range(count):
         tester.generate(llm_instance)

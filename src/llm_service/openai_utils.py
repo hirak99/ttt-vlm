@@ -17,6 +17,7 @@ def _non_streamed_openai_response(
         # reasoning={"effort": "high"},  # you can choose "low", "medium", "high"
         background=False,
     )
+    logging.info(f"Query response: {response.output_text}")
     return response.output_text
 
 
