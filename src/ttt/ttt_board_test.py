@@ -33,6 +33,14 @@ class TttSolverTest(unittest.TestCase):
         self.assertFalse(ttt_board.BoardState.from_array("X..|...|...").x_to_move)
         self.assertFalse(ttt_board.BoardState.from_array(".X.|.X.|O..").x_to_move)
 
+    def test_digest(self):
+        self.assertEqual(ttt_board.BoardState.from_array("...|...|...").digest, 0)
+        self.assertEqual(ttt_board.BoardState.from_array("X..|...|...").digest, 1)
+        self.assertEqual(ttt_board.BoardState.from_array("XO.|...|...").digest, 7)
+        for board_str in _TEST_BOARDS:
+            board = ttt_board.BoardState.from_array(board_str)
+            self.assertEqual(board, ttt_board.BoardState.from_digest(board.digest))
+
 
 if __name__ == "__main__":
     unittest.main()

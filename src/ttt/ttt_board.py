@@ -14,8 +14,38 @@ class BoardState:
     Note: Prefer instantiating through the factory methods over direct instantiation.
     """
 
+    # Bit field to denote where X's are.
     xs: int
+    # Bit field to denote where O's are.
     os: int
+
+    @functools.cached_property
+    def digest(self) -> int:
+        """An integer representation of this position."""
+        result = 0
+        # Get base-3 representation.
+        # Assume X's and O's bitfields as base 3.
+        # Then add X_3 + 2 * O_3.
+        for pos in range(9):
+            if self.xs & (1 << pos):
+                result += 3**pos
+            if self.os & (1 << pos):
+                result += 2 * 3**pos
+        return result
+
+    @classmethod
+    def from_digest(cls, digest: int) -> "BoardState":
+        """Reconstruct the board from digest."""
+        xs = 0
+        os = 0
+        for pos in range(9):
+            bits = digest % 3
+            if bits == 1:
+                xs |= 1 << pos
+            elif bits == 2:
+                os |= 1 << pos
+            digest //= 3
+        return cls(xs, os)
 
     @functools.cached_property
     def x_to_move(self) -> bool:
