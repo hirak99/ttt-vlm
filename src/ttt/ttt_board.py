@@ -17,7 +17,9 @@ class BoardState:
     xs: int
     os: int
 
-    x_to_move: bool
+    @functools.cached_property
+    def x_to_move(self) -> bool:
+        return self.move_count % 2 == 0
 
     @functools.cached_property
     def move_count(self) -> int:
@@ -32,7 +34,7 @@ class BoardState:
             if self.emptys & (1 << n):
                 new_xs = self.xs | (1 << n) if self.x_to_move else self.xs
                 new_os = self.os | (1 << n) if not self.x_to_move else self.os
-                yield BoardState(new_xs, new_os, not self.x_to_move)
+                yield BoardState(new_xs, new_os)
 
     def as_array(self) -> list[str]:
         # Returns ['X', 'X', '.', '.', 'O', 'X', 'O', 'O', 'O'].
@@ -83,4 +85,4 @@ class BoardState:
                 raise IllegalBoardState(f"Must be X, O or .: {board}")
         if x_count != o_count and x_count != o_count + 1:
             raise IllegalBoardState(f"X's must be same or more than O's: {board}")
-        return cls(xs, os, x_count == o_count)
+        return cls(xs, os)

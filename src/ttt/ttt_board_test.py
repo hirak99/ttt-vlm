@@ -26,6 +26,13 @@ class TttSolverTest(unittest.TestCase):
             with self.assertRaises(ttt_board.IllegalBoardState):
                 ttt_board.BoardState.from_array(board_str)
 
+    def test_x_to_move(self):
+        self.assertTrue(ttt_board.BoardState.from_array("...|...|...").x_to_move)
+        self.assertTrue(ttt_board.BoardState.from_array(".X.|...|O..").x_to_move)
+
+        self.assertFalse(ttt_board.BoardState.from_array("X..|...|...").x_to_move)
+        self.assertFalse(ttt_board.BoardState.from_array(".X.|.X.|O..").x_to_move)
+
 
 if __name__ == "__main__":
     unittest.main()
