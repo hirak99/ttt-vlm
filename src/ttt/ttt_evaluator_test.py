@@ -5,7 +5,7 @@ from . import ttt_evaluator
 _TEST_CASES = [
     (
         ("X..|...|..O", "X.O|...|..O"),
-        (ttt_evaluator.TttEvaluation.ILLEGAL, "The move does not define valid state."),
+        (ttt_evaluator.TttEvaluation.INVALID, "The move does not define valid state."),
     ),
     (
         ("X..|...|..O", "X.X|...|..O"),

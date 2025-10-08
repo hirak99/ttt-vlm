@@ -8,6 +8,7 @@ from . import ttt_solver
 class TttEvaluation(enum.Enum):
     NOT_EVALUATED = enum.auto()
 
+    INVALID = enum.auto()
     ILLEGAL = enum.auto()
     BLUNDER = enum.auto()
     STRATEGIC_ERROR = enum.auto()
@@ -29,7 +30,7 @@ class TttEvaluator:
             board1 = ttt_board.BoardState.from_array(board_after_move_str)
         except ttt_board.IllegalBoardState:
             # TODO: Add reasons based on some basic checks on why this move is illegal.
-            return TttEvaluation.ILLEGAL, "The move does not define valid state."
+            return TttEvaluation.INVALID, "The move does not define valid state."
 
         reason, message = self._evaluate_move_internal(board0, board1)
         if reason != TttEvaluation.ILLEGAL:
