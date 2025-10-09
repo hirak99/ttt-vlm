@@ -135,6 +135,9 @@ class _LlmEvaluator:
             duration_ms=duration_ms,
         )
 
+        return result
+
+    def save(self, result: LLMResult):
         # Create log dir if it does not exist.
         _DATA_DIR.mkdir(exist_ok=True)
 
@@ -142,14 +145,15 @@ class _LlmEvaluator:
         with open(self._log_name, "a") as f:
             f.write(result.model_dump_json() + "\n")
 
-        return result
 
-
-def _generate_data(model: str, count: int):
+def _generate_data(model: str, count: int, save_data: bool):
     llm_instance = llm.OpenAiLlmInstance(model)
     tester = _LlmEvaluator()
     for _ in range(count):
         tester.generate(llm_instance)
+        if save_data:
+            tester.save(tester.generate(llm_instance))
+    llm_instance.finalize()
 
 
 if __name__ == "__main__":
@@ -158,13 +162,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--count", help="Number of data points to generate.", type=int, default=10
     )
-    # Argument for model name.
     parser.add_argument(
         "--model",
         help='OpenAI model to load. E.g. "gpt-4.1", "o3", "gpt-3.5-turbo".',
         type=str,
         default="gpt-4.1",
     )
+    # Argument to disable saving the data.
+    parser.add_argument("--no-save", action="store_true")
     args = parser.parse_args()
-    _generate_data(args.model, args.count)
+    _generate_data(args.model, args.count, save_data=not args.no_save)
     logging.info("Done.")
