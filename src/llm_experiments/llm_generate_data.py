@@ -8,23 +8,19 @@ import time
 
 import pydantic
 
-from ..llm_service import abstract_llm
-from ..llm_service import llm
+from . import ttt_players
 from ..ttt import ttt_board
 
 _DATA_DIR = pathlib.Path("_data")
 
 _RANDOM_BOARDS_SEED: int | None = None
 
-# This should be whose_move if AI thinks the game ended.
-_ENDED = "ended"
 
-
-class LLMResult(pydantic.BaseModel):
-    # Original position.
-    board: str
+class PlayerResult(pydantic.BaseModel):
     # When the query was run up to seconds.
     timestamp: int
+    # Original position.
+    board: str
     # Populated if there was error in response like illegal JSON.
     error: str
     # Model used for the LLM.
@@ -76,23 +72,10 @@ class _LlmEvaluator:
         now = datetime.datetime.now()
         self._log_name = _DATA_DIR / now.strftime("%Y%m%d_%H%M%S.jsonl")
 
-    def generate(self, llm_instance: abstract_llm.AbstractLlm):
+    def generate(self, player: ttt_players.AbstractPlayer):
         board = self._boardgen.random_board()
-        prompt_lines = [
-            "Given this tic-tac-toe board, please state your next move.",
-            f"{json.dumps(board.as_array())}",
-            "---",
-            "Your output must be a valid json of the following format -",
-            "{",
-            f'  "whose_move": "X" or "O" or "{_ENDED}",',
-            '  "updated_board": [UPDATED_BOARD_AFTER_MOVE]',
-            "}",
-            'Omit "updated_board" if game has ended.',
-        ]
-        prompt = "\n".join(prompt_lines)
-        logging.info(f"Prompt: {prompt}")
         start_time = time.time()
-        response_json = llm_instance.do_prompt(prompt, max_tokens=1024)
+        response_json = player.play(board)
         duration_ms = int((time.time() - start_time) * 1000)
 
         # Default values if there is any error.
@@ -125,11 +108,11 @@ class _LlmEvaluator:
         except json.JSONDecodeError:
             error = "illegal JSON"
 
-        result = LLMResult(
+        result = PlayerResult(
             board=board.as_string(),
             timestamp=int(time.time()),
             error=error,
-            ai_model=llm_instance.model_description(),
+            ai_model=player.model_description(),
             ai_whose_move=ai_whose_move,
             ai_move=ai_move,
             duration_ms=duration_ms,
@@ -137,7 +120,7 @@ class _LlmEvaluator:
 
         return result
 
-    def save(self, result: LLMResult):
+    def save(self, result: PlayerResult):
         # Create log dir if it does not exist.
         _DATA_DIR.mkdir(exist_ok=True)
 
@@ -146,30 +129,34 @@ class _LlmEvaluator:
             f.write(result.model_dump_json() + "\n")
 
 
-def _generate_data(model: str, count: int, save_data: bool):
-    llm_instance = llm.OpenAiLlmInstance(model)
+def _generate_data(player_name: str, count: int, save_data: bool):
+    player = ttt_players.player_factory(player_name)
     tester = _LlmEvaluator()
-    for _ in range(count):
-        tester.generate(llm_instance)
+    for i in range(count):
+        logging.info(f"Generating {i+1} of {count}...")
+        result = tester.generate(player)
         if save_data:
-            tester.save(tester.generate(llm_instance))
-    llm_instance.finalize()
+            tester.save(result)
+        else:
+            print(result.model_dump_json())
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--count", help="Number of data points to generate.", type=int, default=10
+        "--count", help="Number of data points to generate.", type=int, default=50
     )
     parser.add_argument(
-        "--model",
-        help='OpenAI model to load. E.g. "gpt-4.1", "o3", "gpt-3.5-turbo".',
+        "--player",
+        help='Either "random", or an openAI model name e.g. "gpt-4.1", "o3", "gpt-3.5-turbo".',
         type=str,
         default="gpt-4.1",
     )
     # Argument to disable saving the data.
     parser.add_argument("--no-save", action="store_true")
     args = parser.parse_args()
-    _generate_data(args.model, args.count, save_data=not args.no_save)
+    _generate_data(
+        player_name=args.player, count=args.count, save_data=not args.no_save
+    )
     logging.info("Done.")

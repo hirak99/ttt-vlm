@@ -1,15 +1,25 @@
 import enum
-from typing import Sequence
 
 from . import ttt_board
 from . import ttt_solver
+
+from typing import Sequence
 
 
 class TttEvaluation(enum.Enum):
     NOT_EVALUATED = enum.auto()
 
-    INVALID = enum.auto()
-    ILLEGAL = enum.auto()
+    # Error with parsing the input into a valid board state.
+    PARSE_ERROR = enum.auto()
+    # The board returned could not be read.
+    INVALID_BOARD = enum.auto()
+    # Continued to play after ended.
+    ASSUMED_ENDED = enum.auto()
+    # Played the wrong player, e.g. X for O or O for X.
+    WRONG_PLAYER = enum.auto()
+    # The move is illegal.
+    ILLEGAL_MOVE = enum.auto()
+
     BLUNDER = enum.auto()
     STRATEGIC_ERROR = enum.auto()
     MISCALCULATION = enum.auto()
@@ -30,10 +40,10 @@ class TttEvaluator:
             board1 = ttt_board.BoardState.from_array(board_after_move_str)
         except ttt_board.IllegalBoardState:
             # TODO: Add reasons based on some basic checks on why this move is illegal.
-            return TttEvaluation.INVALID, "The move does not define valid state."
+            return TttEvaluation.INVALID_BOARD, "The move does not define valid state."
 
         reason, message = self._evaluate_move_internal(board0, board1)
-        if reason != TttEvaluation.ILLEGAL:
+        if reason not in [TttEvaluation.ILLEGAL_MOVE, TttEvaluation.PARSE_ERROR]:
             message = f"{message} {self.solver.solve(board1).text_analysis()}"
 
         return reason, message
@@ -53,8 +63,7 @@ class TttEvaluator:
             if legal_move == board1:
                 break
         else:
-            # TODO: Add reasons based on some basic checks on why this move is illegal.
-            return TttEvaluation.ILLEGAL, "The move is illegal."
+            return TttEvaluation.ILLEGAL_MOVE, "Not a valid next move."
 
         for best_move in self.solver.best_moves(board0):
             if best_move == board1:

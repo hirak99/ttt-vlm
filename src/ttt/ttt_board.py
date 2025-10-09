@@ -66,6 +66,14 @@ class BoardState:
                 new_os = self.os | (1 << n) if not self.x_to_move else self.os
                 yield BoardState(new_xs, new_os)
 
+    @functools.cached_property
+    def ended(self) -> bool:
+        try:
+            next(self.allowed_moves())
+        except StopIteration:
+            return True
+        return False
+
     def as_array(self) -> list[str]:
         # Returns ['X', 'X', '.', '.', 'O', 'X', 'O', 'O', 'O'].
         board: list[str] = []
