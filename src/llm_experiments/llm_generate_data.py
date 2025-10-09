@@ -90,6 +90,7 @@ class _LlmEvaluator:
             'Omit "updated_board" if game has ended.',
         ]
         prompt = "\n".join(prompt_lines)
+        logging.info(f"Prompt: {prompt}")
         start_time = time.time()
         response_json = llm_instance.do_prompt(prompt, max_tokens=1024)
         duration_ms = int((time.time() - start_time) * 1000)
@@ -144,10 +145,8 @@ class _LlmEvaluator:
         return result
 
 
-def _generate_data(count: int):
-    # llm_instance = llm.OpenAiLlmInstance("gpt-4.1")
-    # llm_instance = llm.OpenAiLlmInstance("o3")
-    llm_instance = llm.OpenAiLlmInstance("gpt-3.5-turbo")
+def _generate_data(model: str, count: int):
+    llm_instance = llm.OpenAiLlmInstance(model)
     tester = _LlmEvaluator()
     for _ in range(count):
         tester.generate(llm_instance)
@@ -159,6 +158,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--count", help="Number of data points to generate.", type=int, default=10
     )
+    # Argument for model name.
+    parser.add_argument(
+        "--model",
+        help='OpenAI model to load. E.g. "gpt-4.1", "o3", "gpt-3.5-turbo".',
+        type=str,
+        default="gpt-4.1",
+    )
     args = parser.parse_args()
-    _generate_data(args.count)
+    _generate_data(args.model, args.count)
     logging.info("Done.")
