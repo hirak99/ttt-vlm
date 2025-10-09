@@ -19,6 +19,9 @@ AUTO_START_SERVER = True
 
 _LLAMA_PORT = 8080
 
+# These model(s) raises an error saying that the organization must be verified if streaming is attempted.
+_OPENAI_NON_STREAMABLE_MODELS = {"o3"}
+
 
 def _query_llama(
     prompt,
@@ -155,12 +158,20 @@ class OpenAiLlmInstance(abstract_llm.AbstractLlm):
     # TODO: Implement @retry(exceptions=..., delay=..., tries=...)
     @override
     def do_prompt(self, prompt: str, max_tokens: int) -> str:
-        return openai_utils.streamed_openai_response(
-            client=self._client,
-            max_completion_tokens=max_tokens,
-            model=self.model_id,
-            prompt=prompt,
-        )
+        # TODO: Combine the message types, and move this logic to openai_utils.py.
+        if self.model_id in _OPENAI_NON_STREAMABLE_MODELS:
+            return openai_utils.non_streamed_openai_response(
+                client=self._client,
+                model=self.model_id,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        else:
+            return openai_utils.streamed_openai_response(
+                client=self._client,
+                max_completion_tokens=max_tokens,
+                model=self.model_id,
+                messages=[{"role": "user", "content": prompt}]
+            )
 
 
 # Example usage

@@ -2,18 +2,19 @@ import logging
 import sys
 
 import openai
+from openai.types import chat
+from openai.types import responses
 
-# These model(s) raises an error saying that the organization must be verified if streaming is attempted.
-_NON_STREAMABLE_MODELS = {"o3"}
 
-
-def _non_streamed_openai_response(
-    client: openai.OpenAI, model: str, prompt: str
+def non_streamed_openai_response(
+    client: openai.OpenAI,
+    model: str,
+    messages: responses.ResponseInputParam,
 ) -> str:
 
     response = client.responses.create(
         model=model,
-        input=[{"role": "user", "content": prompt}],
+        input=messages,
         # reasoning={"effort": "high"},  # you can choose "low", "medium", "high"
         background=False,
     )
@@ -26,20 +27,16 @@ def streamed_openai_response(
     client: openai.OpenAI,
     model: str,
     max_completion_tokens: int,
-    prompt: str,
+    messages: list[chat.ChatCompletionMessageParam],
 ) -> str:
     """Replacement for client.responses.create.
 
-    Except, it also logs the response to stderr in real-time.
+    Except, it echoes the response to stderr in as it comes in real time.
     """
-    if model in _NON_STREAMABLE_MODELS:
-        logging.info("Using non-streaming query for model: %s", model)
-        return _non_streamed_openai_response(client=client, model=model, prompt=prompt)
-
     try:
         stream = client.chat.completions.create(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
             stream=True,
             max_completion_tokens=max_completion_tokens,
         )
