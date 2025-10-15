@@ -11,14 +11,14 @@ _FINAL_SIZE = 256
 def _add_perspective(
     image: Image.Image, fillcolor: tuple[int, int, int]
 ) -> Image.Image:
-    canvas_scale = random.uniform(1.2, 2.0)
+    canvas_scale = random.uniform(1.5, 2.0)
     width, height = image.size
 
     # fmt: off
     perspective_matrix = [
         1, random.uniform(-0.2, 0.2), -(canvas_scale - 1) * width / 2,
         random.uniform(-0.2, 0.2), 1, -(canvas_scale - 1) * height / 2,
-        0, 0, 1,
+        0, random.uniform(0, 0.0004), 1,
     ]
     # fmt: on
 
