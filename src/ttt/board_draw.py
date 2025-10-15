@@ -4,11 +4,14 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
+_CANVAS_SIZE = 512
+_FINAL_SIZE = 256
+
 
 def _add_perspective(
     image: Image.Image, fillcolor: tuple[int, int, int]
 ) -> Image.Image:
-    canvas_scale = 1.3
+    canvas_scale = random.uniform(1.2, 2.0)
     width, height = image.size
 
     # fmt: off
@@ -31,9 +34,9 @@ def _add_perspective(
 
 
 def to_image(board_str: list[str]) -> Image.Image:
-    img_size = 300
+    img_size = _CANVAS_SIZE
     board_size = 3
-    line_thickness = 5
+    line_thickness = int(5 / 300 * img_size)
     bg_color = tuple(random.randint(192, 255) for _ in range(3))
     assert len(bg_color) == 3  # Hint linter that size is indeed 3.
     image = Image.new("RGB", (img_size, img_size), bg_color)
@@ -72,7 +75,9 @@ def to_image(board_str: list[str]) -> Image.Image:
                 # font = ImageFont.load_default()
                 # draw.text((text_x, text_y), char, fill='black', font=font, anchor="mm")
 
-                font_size = random.randint(36, 55)
+                font_size = int(
+                    random.uniform(36 / 300 * img_size, 55 / 300 * img_size)
+                )
                 font = ImageFont.truetype(
                     "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
                     size=font_size,
@@ -101,4 +106,6 @@ def to_image(board_str: list[str]) -> Image.Image:
                     fillcolor=bg_color + (0,),
                 )
                 image.paste(text_image, (text_x_offset, text_y_offset), text_image)
-    return _add_perspective(image, fillcolor=bg_color)
+    image = _add_perspective(image, fillcolor=bg_color)
+    image = image.resize((_FINAL_SIZE, _FINAL_SIZE), resample=Image.Resampling.BICUBIC)
+    return image
