@@ -13,7 +13,9 @@ _CANVAS_SIZE = 512
 _FINAL_SIZE = 256
 
 
-class BoardRenderer(BaseModel):
+class RenderParams(BaseModel):
+    """Configuration to render a board."""
+
     # Board-level random parameters
     bg_color: tuple[int, int, int]
     line_color: tuple[int, int, int]
@@ -27,7 +29,7 @@ class BoardRenderer(BaseModel):
     perspective_mat: list[float]
 
     @classmethod
-    def random(cls, seed: Optional[int] = None) -> "BoardRenderer":
+    def random(cls, seed: Optional[int] = None) -> "RenderParams":
         rnd = random.Random(seed)
         bg_color = tuple(rnd.randint(192, 255) for _ in range(3))
         assert len(bg_color) == 3  # Hint linter that size is indeed 3.
@@ -68,14 +70,19 @@ class BoardRenderer(BaseModel):
             perspective_mat=perspective_mat,
         )
 
+
+class BoardRenderer:
+    def __init__(self, render_params: RenderParams) -> None:
+        self._rp = render_params
+
     def _add_perspective(
         self, image: Image.Image, fillcolor: tuple[int, int, int]
     ) -> Image.Image:
-        canvas_scale = self.perspective_scale
+        canvas_scale = self._rp.perspective_scale
         width, height = image.size
 
         # fmt: off
-        perspective_matrix = self.perspective_mat.copy()
+        perspective_matrix = self._rp.perspective_mat.copy()
         perspective_matrix[2] = -(canvas_scale - 1) * width / 2
         perspective_matrix[5] = -(canvas_scale - 1) * height / 2
         # fmt: on
@@ -93,7 +100,7 @@ class BoardRenderer(BaseModel):
     def render_board(self, board_str: list[str]) -> Image.Image:
         img_size = _CANVAS_SIZE
         line_thickness = int(5 / 300 * img_size)
-        image = Image.new("RGB", (img_size, img_size), self.bg_color)
+        image = Image.new("RGB", (img_size, img_size), self._rp.bg_color)
         draw = ImageDraw.Draw(image)
 
         cell_size = img_size // _BOARD_SIZE
@@ -102,22 +109,22 @@ class BoardRenderer(BaseModel):
         for i in range(1, _BOARD_SIZE):
             draw.line(
                 (
-                    i * cell_size + self.grid_deviations[i - 1][0],
+                    i * cell_size + self._rp.grid_deviations[i - 1][0],
                     0,
-                    i * cell_size + self.grid_deviations[i - 1][1],
+                    i * cell_size + self._rp.grid_deviations[i - 1][1],
                     img_size,
                 ),
-                fill=self.line_color,
+                fill=self._rp.line_color,
                 width=line_thickness,
             )
             draw.line(
                 (
                     0,
-                    i * cell_size + self.grid_deviations[i - 1][2],
+                    i * cell_size + self._rp.grid_deviations[i - 1][2],
                     img_size,
-                    i * cell_size + self.grid_deviations[i - 1][3],
+                    i * cell_size + self._rp.grid_deviations[i - 1][3],
                 ),
-                fill=self.line_color,
+                fill=self._rp.line_color,
                 width=line_thickness,
             )
 
@@ -135,15 +142,15 @@ class BoardRenderer(BaseModel):
 
                     font = ImageFont.truetype(
                         "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
-                        size=self.font_sizes[index],
+                        size=self._rp.font_sizes[index],
                     )
 
                     text_image = Image.new(
-                        "RGBA", (cell_size, cell_size), self.bg_color + (0,)
+                        "RGBA", (cell_size, cell_size), self._rp.bg_color + (0,)
                     )
                     text_draw = ImageDraw.Draw(text_image)
                     textbbox = text_draw.textbbox((0, 0), char, font)
-                    text_color = self.x_color if char == "X" else self.o_color
+                    text_color = self._rp.x_color if char == "X" else self._rp.o_color
                     text_draw.text((0, 0), char, fill=text_color, font=font)
                     text_x_offset = int(
                         col * cell_size
@@ -157,7 +164,7 @@ class BoardRenderer(BaseModel):
                         - textbbox[1]
                         - textbbox[3] // 2
                     )
-                    degrees = self.text_rotations[index]
+                    degrees = self._rp.text_rotations[index]
                     text_image = text_image.rotate(
                         degrees,
                         center=(
@@ -166,10 +173,10 @@ class BoardRenderer(BaseModel):
                         ),
                         resample=Image.Resampling.BICUBIC,
                         expand=True,
-                        fillcolor=self.bg_color + (0,),
+                        fillcolor=self._rp.bg_color + (0,),
                     )
                     image.paste(text_image, (text_x_offset, text_y_offset), text_image)
-        image = self._add_perspective(image, fillcolor=self.bg_color)
+        image = self._add_perspective(image, fillcolor=self._rp.bg_color)
         image = image.resize(
             (_FINAL_SIZE, _FINAL_SIZE), resample=Image.Resampling.BICUBIC
         )
