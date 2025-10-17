@@ -1,7 +1,6 @@
 import os
 
 from . import llm_generate_data
-from ..llm_experiments import llm_generate_data
 from ..ttt import ttt_board
 from ..ttt import ttt_evaluator
 
