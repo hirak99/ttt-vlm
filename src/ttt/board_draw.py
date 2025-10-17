@@ -71,7 +71,7 @@ class RenderParams(BaseModel):
         )
 
 
-class BoardRenderer:
+class _BoardRenderer:
     def __init__(self, render_params: RenderParams) -> None:
         self._rp = render_params
 
@@ -181,3 +181,7 @@ class BoardRenderer:
             (_FINAL_SIZE, _FINAL_SIZE), resample=Image.Resampling.BICUBIC
         )
         return image
+
+
+def to_image(board_str: list[str], render_params: RenderParams) -> Image.Image:
+    return _BoardRenderer(render_params).render_board(board_str)
