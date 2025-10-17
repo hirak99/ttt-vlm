@@ -5,6 +5,8 @@ from PIL import ImageDraw
 from PIL import ImageFont
 from pydantic import BaseModel
 
+from .. import misc_utils
+
 from typing import Optional
 
 _BOARD_SIZE = 3
@@ -141,7 +143,7 @@ class _BoardRenderer:
                     # draw.text((text_x, text_y), char, fill='black', font=font, anchor="mm")
 
                     font = ImageFont.truetype(
-                        "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
+                        misc_utils.pil_font(),
                         size=self._rp.font_sizes[index],
                     )
 

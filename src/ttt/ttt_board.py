@@ -105,8 +105,11 @@ class BoardState:
             board = board.replace("|", "")
             if len(board) != 9:
                 raise IllegalBoardState(f"Must be 9 characters long: {board}")
-            if not all(c in "XO." for c in board):
-                raise IllegalBoardState(f"Must be X, O or .: {board}")
+            illegal_chars = [c for c in board if c not in "XO."]
+            if illegal_chars:
+                raise IllegalBoardState(
+                    f"Must be X, O or ., but found {illegal_chars} in {board}"
+                )
 
         xs = 0
         os = 0
@@ -119,7 +122,7 @@ class BoardState:
             elif c == "O":
                 os |= 1 << n
                 o_count += 1
-            elif c != ".":
+            elif c not in [".", ""]:
                 raise IllegalBoardState(f"Must be X, O or .: {board}")
         if x_count != o_count and x_count != o_count + 1:
             raise IllegalBoardState(f"X's must be same or more than O's: {board}")
