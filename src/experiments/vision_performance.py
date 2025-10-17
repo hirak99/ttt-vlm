@@ -1,6 +1,8 @@
 from . import board_utils
+from ..llm_service import abstract_llm
 from ..llm_service import vision
 from ..ttt import board_draw
+from ..ttt import ttt_board
 
 _PROMPT = """
 Please identify this tic-tac-toe position.
@@ -14,16 +16,24 @@ Do not output anything else.
 """
 
 
-def _evaluate_wip():
-    board = board_utils.random_board()
+def _ai_recognize(
+    instance: abstract_llm.AbstractLlm,
+    board: ttt_board.BoardState,
+    render_params: board_draw.RenderParams,
+) -> str:
     print(board.as_array())
-    render_params = board_draw.RenderParams.random()
     image = board_draw.to_image(board.as_array(), render_params)
-    instance = vision.OpenAiVision()
     return instance.do_prompt(
         _PROMPT, max_tokens=1024, image_b64=vision.to_base64(image)
     )
 
 
+def main():
+    board = board_utils.random_board()
+    render_params = board_draw.RenderParams.random()
+    instance = vision.OpenAiVision()
+    _ai_recognize(instance, board, render_params)
+
+
 if __name__ == "__main__":
-    _evaluate_wip()
+    main()
