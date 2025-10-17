@@ -6,7 +6,7 @@ import os
 def pil_font() -> str:
     path_canidates = [
         "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",  # Arch
-        "/usr/share/fonts/liberation/truetype/LiberationSans-Regular.ttf",  # Debian
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",  # Debian
     ]
     for path in path_canidates:
         if os.path.exists(path):

@@ -6,21 +6,33 @@ The goal is to have the AI -
 1. Understand tic-tac-toe grid pictured through a phone camera
 2. Offer a formidable (perfect?) gameplay as an opponent
 
-# Running
+# Evaluating
 
-## Generate Examples
+## Strategic Performance
+
+### Generate Examples
 
 ```sh
 python -m src.llm_experiments.llm_generate_data --player "o3-mini"
 ```
 
-## Evaluate
+### Evaluate
 Use [chart_results](./chart_results.ipynb) to evaluate and visualize.
 
-## Demo
+### Demo
 
 A demo / playground for the evaluator can be served via -
 
 ```sh
 ./run_ui_demo.sh
 ```
+
+## Vision Performance
+
+```sh
+python -m src.experiments.vision_performance
+```
+
+This will create a png grid with results.
+
+For adhoc experiments, use the notebook with similar name.
