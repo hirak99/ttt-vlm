@@ -36,32 +36,36 @@ class RenderParams(BaseModel):
 
     @classmethod
     def random(cls, seed: Optional[int] = None) -> "RenderParams":
-        rnd = random.Random(seed)
-        bg_color = tuple(rnd.randint(192, 255) for _ in range(3))
+        rng = random.Random(seed)
+        bg_color = tuple(rng.randint(192, 255) for _ in range(3))
         assert len(bg_color) == 3  # Hint linter that size is indeed 3.
-        line_color = tuple(rnd.randint(0, 92) for _ in range(3))
+        line_color = tuple(rng.randint(0, 92) for _ in range(3))
         assert len(line_color) == 3  # Hint linter that size is indeed 3.
 
+        # Possible colors for 'X' marks to choose from.
         x_colors = [(0, 0, 0), (128, 64, 0), (0, 64, 128), (92, 64, 51), (60, 93, 52)]
+        # Possible colors for 'O' marks to choose from.
         o_colors = x_colors
-        x_color = x_colors[rnd.randint(0, len(x_colors) - 1)]
-        o_color = o_colors[rnd.randint(0, len(o_colors) - 1)]
+
+        x_color = x_colors[rng.randint(0, len(x_colors) - 1)]
+        o_color = o_colors[rng.randint(0, len(o_colors) - 1)]
+        # Imperfections in drawing the grid lines.
         grid_deviations = [
-            [rnd.randint(-5, 5) for _ in range(4)] for _ in range(_BOARD_SIZE - 1)
+            [rng.randint(-5, 5) for _ in range(4)] for _ in range(_BOARD_SIZE - 1)
         ]
         font_sizes = [
-            int(rnd.uniform(36 / 300 * 512, 55 / 300 * 512)) for _ in range(9)
+            int(rng.uniform(36 / 300 * 512, 55 / 300 * 512)) for _ in range(9)
         ]
-        text_rotations = [rnd.randint(-10, 10) for _ in range(9)]
+        text_rotations = [rng.randint(-10, 10) for _ in range(9)]
 
-        canvas_scale = rnd.uniform(1.5, 2.0)  # Perspective scale.
+        canvas_scale = rng.uniform(1.5, 2.0)  # Perspective scale.
 
         # Note: Elemetns [2] and [5] depend on width and will be computed on the fly.
         # fmt: off
         perspective_mat = [
-            1, rnd.uniform(-0.2, 0.2), 0,
-            rnd.uniform(-0.2, 0.2), 1, 0,
-            0, rnd.uniform(0, 0.0004), 1,
+            1, rng.uniform(-0.2, 0.2), 0,
+            rng.uniform(-0.2, 0.2), 1, 0,
+            0, rng.uniform(0, 0.0004), 1,
         ]
         # fmt: on
         return cls(
