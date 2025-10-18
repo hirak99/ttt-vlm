@@ -1,12 +1,16 @@
 import logging
 import sys
-from typing import cast
 
 import openai
 from openai.types import chat
 from openai.types import responses
 
-# These model(s) raises an error saying that the organization must be verified if streaming is attempted.
+from . import openai_type_helper
+
+# Default is True, which uses streaming mode to echo responses to stderr.
+_USE_STREAMING_ALWAYS = True
+
+# These model(s) raise error, saying that the organization must be verified if streaming is attempted.
 _NON_STREAMABLE_MODELS = {"o3"}
 
 
@@ -31,20 +35,20 @@ def streamed_openai_response(
     client: openai.OpenAI,
     model: str,
     max_completion_tokens: int,
-    messages: list[chat.ChatCompletionMessageParam] | responses.ResponseInputParam,
+    messages: list[chat.ChatCompletionMessageParam],
 ) -> str:
     """Replacement for client.responses.create.
 
     Except, it echoes the response to stderr in as it comes in real time.
     """
-    if model in _NON_STREAMABLE_MODELS:
+    if not _USE_STREAMING_ALWAYS or model in _NON_STREAMABLE_MODELS:
         # TODO: Implement compile-time checks if possible?
         # I think run-time checks will be done by OpenAI.
         # These two are very similar.
-        messages = cast(responses.ResponseInputParam, messages)
-        return _non_streamed_openai_response(client, model, messages)
+        return _non_streamed_openai_response(
+            client, model, openai_type_helper.chatcompletion_to_responseinput(messages)
+        )
 
-    messages = cast(list[chat.ChatCompletionMessageParam], messages)
     try:
         stream = client.chat.completions.create(
             model=model,

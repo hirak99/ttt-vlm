@@ -1,8 +1,8 @@
-import time
 import dataclasses
 import datetime
 import logging
 import os
+import time
 
 from PIL import Image
 from PIL import ImageDraw
@@ -183,6 +183,7 @@ def main():
 
     instance = vision.OllamaVision("blaifa/InternVL3_5:8b")
     # instance = vision.OpenAiVision("gpt-4.1")
+    # instance = vision.OpenAiVision("o3")
 
     image = random_eval_grid("Model: " + instance.model_description(), instance, 10, 10)
     # Date time for file suffix.
