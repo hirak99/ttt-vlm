@@ -1,3 +1,5 @@
+import time
+import dataclasses
 import datetime
 import logging
 import os
@@ -34,6 +36,13 @@ Output just the JSON. Do not output anything else.
 _SKIP_LLM_FOR_TESTS = False
 
 
+@dataclasses.dataclass
+class _EvalResult:
+    time_taken: float
+    correct: bool
+    anotated_image: Image.Image
+
+
 def _ai_recognize(instance: abstract_llm.AbstractLlm, image: Image.Image) -> str:
     return instance.do_prompt(
         _PROMPT, max_tokens=1024, image_b64=vision.to_base64(image)
@@ -41,8 +50,11 @@ def _ai_recognize(instance: abstract_llm.AbstractLlm, image: Image.Image) -> str
 
 
 def _result_to_image(
-    board_image: Image.Image, board_actual: ttt_board.BoardState, ai_output: str
-) -> tuple[bool, Image.Image]:
+    board_image: Image.Image,
+    board_actual: ttt_board.BoardState,
+    ai_output: str,
+    time_taken: float,
+) -> _EvalResult:
     image = Image.new("RGB", _GRID_SIZE, (255, 255, 255))
     image_size = (_GRID_SIZE[0] - _MARGIN, _GRID_SIZE[0] - _MARGIN)
     image.paste(board_image.resize(image_size), (_MARGIN, _MARGIN))
@@ -85,22 +97,31 @@ def _result_to_image(
         fill=text_color,
         font=font,
     )
-    return correct, image
+    return _EvalResult(correct=correct, anotated_image=image, time_taken=time_taken)
 
 
 def _random_board_eval(
     llm_instance: abstract_llm.AbstractLlm,
-) -> tuple[bool, Image.Image]:
+) -> _EvalResult:
     board = board_utils.random_board()
     logging.info(f"Random board: {board.as_array()}")
     render_params = board_draw.RenderParams.random()
     image = board_draw.to_image(board.as_array(), render_params)
+
+    start_time = time.time()
     if _SKIP_LLM_FOR_TESTS:
         recognized = '["O", "", "O", "", "O", "X", "X", "", "X"]'
     else:
         recognized = _ai_recognize(llm_instance, image)
+    time_taken = time.time() - start_time
+
     logging.info(f"AI Output: {recognized!r}")
-    return _result_to_image(image, board, recognized)
+    return _result_to_image(
+        board_image=image,
+        board_actual=board,
+        ai_output=recognized,
+        time_taken=time_taken,
+    )
 
 
 def random_eval_grid(
@@ -109,8 +130,8 @@ def random_eval_grid(
     header_height = 40
 
     # Call the test_random_board to get the size of a single board
-    correct, sample_board = _random_board_eval(llm_instance)
-    board_width, board_height = sample_board.size
+    eval_result = _random_board_eval(llm_instance)
+    board_width, board_height = eval_result.anotated_image.size
 
     # Create a new blank image large enough to hold all the boards
     grid_width = cols * board_width
@@ -118,32 +139,38 @@ def random_eval_grid(
 
     grid_image = Image.new("RGB", (grid_width, grid_height), (255, 255, 255))
 
+    sample_size = rows * cols
+
     # Loop through each cell in the grid
     success_counter = 0
+    total_time = 0.0
     for row in range(rows):
         for col in range(cols):
-            logging.info(f"Test {row * cols + col + 1} of {rows * cols} ...")
-            if row == 0 and col == 0:
-                board = sample_board
-            else:
-                correct, board = _random_board_eval(llm_instance)
+            logging.info(f"Test {row * cols + col + 1} of {sample_size} ...")
 
-            if correct:
+            # Re-use the first result for the first board, otherwise get a new eval.
+            if not (row == 0 and col == 0):
+                eval_result = _random_board_eval(llm_instance)
+
+            if eval_result.correct:
                 success_counter += 1
+            total_time += eval_result.time_taken
 
             # Calculate where to paste this board in the grid
             x_offset = col * board_width
             y_offset = row * board_height + header_height
 
             # Paste the board into the grid
-            grid_image.paste(board, (x_offset, y_offset))
+            grid_image.paste(eval_result.anotated_image, (x_offset, y_offset))
 
     # Write header.
+    header = f"{header}\nCorrect: {success_counter}/{sample_size}, Avg. Inference Time: {total_time / sample_size:.2f}s"
+    logging.info(f"Header: {header}")
     draw = ImageDraw.Draw(grid_image)
     font = ImageFont.truetype(misc_utils.pil_font(), size=16)
     draw.text(
         xy=(_MARGIN, 0),
-        text=f"{header}\nCorrect: {success_counter}/{rows*cols}",
+        text=header,
         fill=(0, 0, 0),
         font=font,
     )
