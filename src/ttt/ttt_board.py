@@ -1,5 +1,6 @@
 import dataclasses
 import functools
+
 from typing import Iterator, Sequence
 
 
