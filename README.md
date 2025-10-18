@@ -2,9 +2,13 @@
 
 We use tic-tac-toe as a toy problem here to learn how to train an AI to play it well.
 
-The goal is to have the AI -
-1. Understand tic-tac-toe grid pictured through a phone camera
-2. Offer a formidable (perfect?) gameplay as an opponent
+## Goals
+
+The main goal is to see how far VLMs can be pushed to understand Tic Tac Toe.
+
+The two sub-goals are to have the AI -
+1. To understand tic-tac-toe grid from visuals e.g. phone camera.
+2. To offer a formidable gameplay as an opponent.
 
 # Evaluating
 

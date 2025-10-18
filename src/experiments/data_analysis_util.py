@@ -16,9 +16,10 @@ class DataAnalyzer:
     def analyse(
         self, data: llm_generate_data.PlayerResult
     ) -> tuple[ttt_evaluator.TttEvaluation, str]:
-        initial_board = ttt_board.BoardState.from_array(data.board)
         if data.error:
             return ttt_evaluator.TttEvaluation.PARSE_ERROR, data.error
+
+        initial_board = ttt_board.BoardState.from_array(data.board)
 
         match data.ai_whose_move:
             case "X" | "O":

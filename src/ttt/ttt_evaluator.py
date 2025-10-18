@@ -9,7 +9,9 @@ from typing import Sequence
 class TttEvaluation(enum.Enum):
     NOT_EVALUATED = enum.auto()
 
-    # Error with parsing the input into a valid board state.
+    # Denotes error with basic parsing of the input as JSON.
+    # This is populated outside this module.
+    # TODO: Move the parsing of json directly into this module.
     PARSE_ERROR = enum.auto()
     # The board returned could not be read.
     INVALID_BOARD = enum.auto()
@@ -40,7 +42,7 @@ class TttEvaluator:
             board1 = ttt_board.BoardState.from_array(board_after_move_str)
         except ttt_board.IllegalBoardState:
             # TODO: Add reasons based on some basic checks on why this move is illegal.
-            return TttEvaluation.INVALID_BOARD, "The move does not define valid state."
+            return TttEvaluation.INVALID_BOARD, "The move is not a valid board state."
 
         reason, message = self._evaluate_move_internal(board0, board1)
         if reason not in [TttEvaluation.ILLEGAL_MOVE, TttEvaluation.PARSE_ERROR]:

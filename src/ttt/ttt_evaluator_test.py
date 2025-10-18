@@ -5,7 +5,10 @@ from . import ttt_evaluator
 _TEST_CASES = [
     (
         ("X..|...|..O", "X.O|...|..O"),
-        (ttt_evaluator.TttEvaluation.PARSE_ERROR, "The move does not define valid state."),
+        (
+            ttt_evaluator.TttEvaluation.INVALID_BOARD,
+            "The move is not a valid board state.",
+        ),
     ),
     (
         ("X..|...|..O", "X.X|...|..O"),
@@ -13,11 +16,17 @@ _TEST_CASES = [
     ),
     (
         ("X..|...|...", "X.O|...|..."),
-        (ttt_evaluator.TttEvaluation.BLUNDER, "Was draw, now opponent wins. X wins in 5 moves."),
+        (
+            ttt_evaluator.TttEvaluation.BLUNDER,
+            "Was draw, now opponent wins. X wins in 5 moves.",
+        ),
     ),
     (
         ("X.O|...|...", "X.O|.X.|..."),
-        (ttt_evaluator.TttEvaluation.BLUNDER, "Was won, but now only a draw. Drawn position."),
+        (
+            ttt_evaluator.TttEvaluation.BLUNDER,
+            "Was won, but now only a draw. Drawn position.",
+        ),
     ),
 ]
 

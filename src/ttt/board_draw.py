@@ -16,7 +16,11 @@ _FINAL_SIZE = 256
 
 
 class RenderParams(BaseModel):
-    """Configuration to render a board."""
+    """Configuration to render a board.
+
+    This can be saved to json to enable recreation of the exact image.
+    Use the .random() factory to generate random parameters.
+    """
 
     # Board-level random parameters
     bg_color: tuple[int, int, int]
