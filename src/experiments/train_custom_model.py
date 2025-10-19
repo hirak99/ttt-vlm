@@ -1,4 +1,3 @@
-import pydantic
 import argparse
 import itertools
 import logging
@@ -7,6 +6,8 @@ import random
 import time
 
 from PIL import Image
+import pydantic
+import safetensors.torch
 import torch
 from torch import nn
 from torch import optim
@@ -31,7 +32,10 @@ _BATCH_SIZE = 32
 
 _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# Saved at the end of every epoch.
 _CHECKPOINT_FILE = pathlib.Path("_checkpoint.pth")
+# Saved after all epochs are done.
+_FINAL_MODEL_FILE = pathlib.Path("_data") / "custom_model.safetensor"
 
 
 # Custom data saved with checkpoint.
@@ -101,6 +105,14 @@ class _TicTacToeViT(nn.Module):
 
         x = x.view(-1, _NUM_CLASSES, 3)
         return x
+
+    def save_savetensors(self, fname: pathlib.Path):
+        safetensors.torch.save_file(self.state_dict(), fname)
+        logging.info(f"Saved model to {fname}")
+
+    def load_safetensors(self, fname: pathlib.Path):
+        self.load_state_dict(safetensors.torch.load_file(fname))
+        logging.info(f"Loaded model from {fname}")
 
 
 def _save_checkpoint(
@@ -189,7 +201,7 @@ def _train(use_checkpoints: bool):
         ):
             optimizer.zero_grad()
             outputs = model(images)
-            # Convert this into view of [batch * 9, 3], i.e. batch * 9 independent classes.
+            # Convert this into view of [batch * 9, 3], i.e. (batch * 9) independent classes.
             loss = criterion(outputs.view(-1, 3), labels.view(-1, 3))
             loss.backward()
             optimizer.step()
@@ -206,6 +218,7 @@ def _train(use_checkpoints: bool):
 
         model.eval()
         # TODO: Can put out-of-sample evaluation code here.
+        # For now, just show one result.
         image, label = next(iter(test_dataset))
         print(f"True Label: {label}")
         with torch.no_grad():
@@ -218,6 +231,8 @@ def _train(use_checkpoints: bool):
                 optimizer=optimizer,
                 epoch_stats=epoch_stats,
             )
+
+    model.save_savetensors(_FINAL_MODEL_FILE)
 
 
 def main():
