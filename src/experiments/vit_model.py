@@ -7,7 +7,6 @@ from PIL import Image
 import torch
 from torch import nn
 from torch import optim
-from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from torch.utils.data import IterableDataset
 import torchvision.transforms as transforms
@@ -23,9 +22,9 @@ _NUM_CLASSES = 9
 # Size to which the image will be resized to.
 _IMAGE_SIZE = 224
 
-_BATCH_SIZE = 32
-_SAMPLES_PER_EPOCH = 20
 _EPOCHS = 100
+_BATCHES_PER_EPOCH = 50
+_BATCH_SIZE = 32
 
 _DEVICE = "cuda"
 
@@ -57,34 +56,39 @@ class _TicTacToeDataset(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
 class _TicTacToeViT(nn.Module):
     def __init__(self):
         super(_TicTacToeViT, self).__init__()
-        # First convolutional block
-        self._conv1 = nn.Conv2d(
-            in_channels=3, out_channels=64, kernel_size=7, stride=2, padding=3
-        )  # 224x224 -> 112x112
-        self._conv2 = nn.Conv2d(
-            64, 128, kernel_size=5, stride=2, padding=2
-        )  # 112x112 -> 56x56
-        self._conv3 = nn.Conv2d(
-            128, 256, kernel_size=3, stride=2, padding=1
-        )  # 56x56 -> 28x28
 
-        # Batch normalization for better convergence
-        self._bn1 = nn.BatchNorm2d(128)
-        self._bn2 = nn.BatchNorm2d(256)
+        self.features = nn.Sequential(
+            nn.Conv2d(3, 32, kernel_size=3, padding=1),  # 224x224 -> 224x224
+            nn.ReLU(),
+            nn.BatchNorm2d(32),
+            nn.MaxPool2d(2),  # 112x112
 
-        # Fully connected layers for final grid cell classification
-        self._fc1 = nn.Linear(256 * 28 * 28, 1024)  # From 28x28x256 to a dense layer
-        self._fc2 = nn.Linear(1024, 9 * 3)
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(64),
+            nn.MaxPool2d(2),  # 56x56
+
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(128),
+            nn.MaxPool2d(2),  # 28x28
+
+            nn.Conv2d(128, 128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(128),
+            nn.MaxPool2d(2),  # 14x14
+        )
+
+        self.classifier = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(128 * 14 * 14, 512),
+            nn.ReLU(),
+            nn.Linear(512, _NUM_CLASSES * 3),
+        )
 
     def forward(self, x):
-        x = F.relu(self._conv1(x))
-        x = F.relu(self._bn1(self._conv2(x)))
-        x = F.relu(self._bn2(self._conv3(x)))
-
-        x = torch.flatten(x, 1)
-
-        x = F.relu(self._fc1(x))
-        x = self._fc2(x)
+        x = self.features(x)
+        x = self.classifier(x)
 
         x = x.view(-1, _NUM_CLASSES, 3)
         return x
@@ -149,7 +153,7 @@ def _train(use_checkpoints: bool):
         # Normally whole dataset is one epoch.
         # However, we have infinite data. So we arbitrarily define epoch size.
         for index, (images, labels) in enumerate(
-            itertools.islice(train_loader, _SAMPLES_PER_EPOCH)
+            itertools.islice(train_loader, _BATCHES_PER_EPOCH)
         ):
             optimizer.zero_grad()
             outputs = model(images)
@@ -159,7 +163,7 @@ def _train(use_checkpoints: bool):
             optimizer.step()
             running_loss += loss.item()
             print(
-                f"Epoch: {epoch}, Index: {index}/{_SAMPLES_PER_EPOCH}, Loss: {running_loss/(index + 1)}"
+                f"Epoch: {epoch}, Index: {index}/{_BATCHES_PER_EPOCH}, Loss: {running_loss/(index + 1)}"
             )
 
         model.eval()
