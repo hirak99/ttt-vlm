@@ -1,5 +1,6 @@
 import itertools
 import logging
+import pathlib
 import random
 
 from PIL import Image
@@ -27,6 +28,8 @@ _SAMPLES_PER_EPOCH = 20
 _EPOCHS = 100
 
 _DEVICE = "cuda"
+
+_CHECKPOINT_FILE = pathlib.Path("_checkpoint.pth")
 
 
 class _TicTacToeDataset(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
@@ -87,7 +90,29 @@ class _TicTacToeViT(nn.Module):
         return x
 
 
-def _train():
+def _save_checkpoint(
+    fname: pathlib.Path, model: _TicTacToeViT, optimizer: optim.Optimizer, epoch: int
+):
+    torch.save(
+        {
+            "epoch": epoch,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+        },
+        fname,
+    )
+
+
+def _load_checkpoint(
+    fname: pathlib.Path, model: _TicTacToeViT, optimizer: optim.Optimizer
+) -> int:
+    checkpoint = torch.load(fname)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    return checkpoint["epoch"]
+
+
+def _train(use_checkpoints: bool):
     transform = transforms.Compose(
         [
             transforms.Resize((_IMAGE_SIZE, _IMAGE_SIZE)),
@@ -102,13 +127,23 @@ def _train():
     test_dataset = _TicTacToeDataset(transform)
 
     model = _TicTacToeViT().to(_DEVICE)
-
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
+
+    params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Model has {params:_} parameters.")
+    size_in_mb = params * 4 / 1024 / 1024
+    print(f"Model size: {size_in_mb:.2f} MB")
+
+    start_epoch = 0
+    if use_checkpoints and _CHECKPOINT_FILE.exists():
+        logging.info(f"Checkpoint exists. Loading.")
+        start_epoch = _load_checkpoint(_CHECKPOINT_FILE, model, optimizer)
+        logging.info(f"Loaded checkpoint. Starting epoch: {start_epoch}")
+
     criterion = nn.CrossEntropyLoss()
-    # criterion = nn.BCEWithLogitsLoss()
 
     # Training loop.
-    for epoch in range(_EPOCHS):  # number of epochs
+    for epoch in range(start_epoch, _EPOCHS):  # number of epochs
         model.train()
         running_loss = 0.0
         # Normally whole dataset is one epoch.
@@ -134,11 +169,13 @@ def _train():
         with torch.no_grad():
             outputs = model(image.unsqueeze(0))
         print(f"Inferred Label: {outputs}")
+        if use_checkpoints:
+            _save_checkpoint(_CHECKPOINT_FILE, model, optimizer, epoch)
 
 
 def main():
     logging.basicConfig(level=logging.INFO)
-    _train()
+    _train(use_checkpoints=False)
 
 
 if __name__ == "__main__":
