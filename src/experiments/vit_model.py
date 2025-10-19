@@ -27,7 +27,7 @@ _EPOCHS = 100
 _BATCHES_PER_EPOCH = 50
 _BATCH_SIZE = 32
 
-_DEVICE = "cuda"
+_DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 _CHECKPOINT_FILE = pathlib.Path("_checkpoint.pth")
 
@@ -117,6 +117,8 @@ def _load_checkpoint(
 
 
 def _train(use_checkpoints: bool):
+    logging.info(f"Using device: {_DEVICE}")
+
     transform = transforms.Compose(
         [
             transforms.Resize((_IMAGE_SIZE, _IMAGE_SIZE)),
