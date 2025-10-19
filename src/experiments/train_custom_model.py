@@ -1,8 +1,10 @@
+import pydantic
 import argparse
 import itertools
 import logging
 import pathlib
 import random
+import time
 
 from PIL import Image
 import torch
@@ -23,13 +25,22 @@ _NUM_CLASSES = 9
 # Size to which the image will be resized to.
 _IMAGE_SIZE = 224
 
-_EPOCHS = 100
+_EPOCHS = 20
 _BATCHES_PER_EPOCH = 50
 _BATCH_SIZE = 32
 
 _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 _CHECKPOINT_FILE = pathlib.Path("_checkpoint.pth")
+
+
+# Custom data saved with checkpoint.
+class _EpochStats(pydantic.BaseModel):
+    duration: float
+    loss: float
+
+
+_EpochStatsList = pydantic.RootModel[list[_EpochStats]]
 
 
 class _TicTacToeDataset(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
@@ -93,13 +104,16 @@ class _TicTacToeViT(nn.Module):
 
 
 def _save_checkpoint(
-    fname: pathlib.Path, model: _TicTacToeViT, optimizer: optim.Optimizer, epoch: int
+    fname: pathlib.Path,
+    model: _TicTacToeViT,
+    optimizer: optim.Optimizer,
+    epoch_stats: _EpochStatsList,
 ):
     torch.save(
         {
-            "epoch": epoch,
             "model_state_dict": model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
+            "epoch_stats": epoch_stats.model_dump(),
         },
         fname,
     )
@@ -107,13 +121,17 @@ def _save_checkpoint(
 
 
 def _load_checkpoint(
-    fname: pathlib.Path, model: _TicTacToeViT, optimizer: optim.Optimizer
-) -> int:
+    fname: pathlib.Path,
+    model: _TicTacToeViT,
+    optimizer: optim.Optimizer,
+    epoch_stats: _EpochStatsList,
+) -> None:
+    """Returns training time."""
     checkpoint = torch.load(fname)
     model.load_state_dict(checkpoint["model_state_dict"])
     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    epoch_stats.model_validate(checkpoint["epoch_stats"])
     logging.info(f"Loaded checkpoint from {fname}")
-    return checkpoint["epoch"]
 
 
 def _train(use_checkpoints: bool):
@@ -140,22 +158,30 @@ def _train(use_checkpoints: bool):
     size_in_mb = params * 4 / 1024 / 1024
     print(f"Model size: {size_in_mb:.2f} MB")
 
-    start_epoch = 0
+    epoch_stats = _EpochStatsList([])
+
     if not use_checkpoints:
         logging.info("Not using checkpoints.")
     else:
         if _CHECKPOINT_FILE.exists():
             logging.info(f"Checkpoint exists. Loading.")
-            start_epoch = _load_checkpoint(_CHECKPOINT_FILE, model, optimizer)
+            start_epoch = _load_checkpoint(
+                fname=_CHECKPOINT_FILE,
+                model=model,
+                optimizer=optimizer,
+                epoch_stats=epoch_stats,
+            )
         else:
             logging.info(f"Checkpoint does not exist. Starting from scratch.")
 
     criterion = nn.CrossEntropyLoss()
 
     # Training loop.
+    start_epoch = len(epoch_stats.root)
     for epoch in range(start_epoch, _EPOCHS):  # number of epochs
         model.train()
         running_loss = 0.0
+        start_time = time.time()
         # Normally whole dataset is one epoch.
         # However, we have infinite data. So we arbitrarily define epoch size.
         for index, (images, labels) in enumerate(
@@ -169,8 +195,14 @@ def _train(use_checkpoints: bool):
             optimizer.step()
             running_loss += loss.item()
             print(
-                f"Epoch: {epoch}/{_EPOCHS}, Index: {index}/{_BATCHES_PER_EPOCH}, Loss: {running_loss/(index + 1)}"
+                f"Epoch: {epoch}/{_EPOCHS}, Index: {index}/{_BATCHES_PER_EPOCH}, Avg. Loss this epoch: {running_loss/(index + 1)}"
             )
+
+        epoch_time = time.time() - start_time
+
+        epoch_stats.root.append(
+            _EpochStats(duration=epoch_time, loss=running_loss / _BATCHES_PER_EPOCH)
+        )
 
         model.eval()
         # TODO: Can put out-of-sample evaluation code here.
@@ -180,7 +212,12 @@ def _train(use_checkpoints: bool):
             outputs = model(image.unsqueeze(0))
         print(f"Inferred Label: {outputs}")
         if use_checkpoints:
-            _save_checkpoint(_CHECKPOINT_FILE, model, optimizer, epoch)
+            _save_checkpoint(
+                fname=_CHECKPOINT_FILE,
+                model=model,
+                optimizer=optimizer,
+                epoch_stats=epoch_stats,
+            )
 
 
 def main():
