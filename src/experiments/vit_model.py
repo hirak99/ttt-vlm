@@ -4,13 +4,12 @@ import random
 
 from PIL import Image
 import torch
-import torch.nn as nn
-import torch.optim as optim
+from torch import nn
+from torch import optim
+from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from torch.utils.data import IterableDataset
 import torchvision.transforms as transforms
-from transformers import ViTConfig
-from transformers import ViTModel
 
 from ..ttt import board_draw
 
@@ -52,26 +51,39 @@ class _TicTacToeDataset(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
             yield image_tensor.to(_DEVICE), label_tensor.to(_DEVICE)
 
 
-# Configuration to instantiate ViTModel.
-_CONFIG = ViTConfig(
-    image_size=_IMAGE_SIZE,
-)
-
-
 class _TicTacToeViT(nn.Module):
-    def __init__(self, config: ViTConfig):
+    def __init__(self):
         super(_TicTacToeViT, self).__init__()
-        self._vit = ViTModel(config)
-        self._fc = nn.Linear(768, 3 * _NUM_CLASSES)
+        # First convolutional block
+        self._conv1 = nn.Conv2d(
+            in_channels=3, out_channels=64, kernel_size=7, stride=2, padding=3
+        )  # 224x224 -> 112x112
+        self._conv2 = nn.Conv2d(
+            64, 128, kernel_size=5, stride=2, padding=2
+        )  # 112x112 -> 56x56
+        self._conv3 = nn.Conv2d(
+            128, 256, kernel_size=3, stride=2, padding=1
+        )  # 56x56 -> 28x28
+
+        # Batch normalization for better convergence
+        self._bn1 = nn.BatchNorm2d(128)
+        self._bn2 = nn.BatchNorm2d(256)
+
+        # Fully connected layers for final grid cell classification
+        self._fc1 = nn.Linear(256 * 28 * 28, 1024)  # From 28x28x256 to a dense layer
+        self._fc2 = nn.Linear(1024, 9 * 3)
 
     def forward(self, x):
-        x = self._vit(x).last_hidden_state
-        print(x.shape)  # [32, <model-specific>, 768]
-        x = x.mean(dim=1)  # Global average pooling across patches.
-        print(x.shape)  # [32, 768]
-        x = self._fc(x)
-        print(x.shape)  # [32, 27]
-        x = x.view(-1, _NUM_CLASSES, 3)  # Shape: [batch_size, 9, 3]
+        x = F.relu(self._conv1(x))
+        x = F.relu(self._bn1(self._conv2(x)))
+        x = F.relu(self._bn2(self._conv3(x)))
+
+        x = torch.flatten(x, 1)
+
+        x = F.relu(self._fc1(x))
+        x = self._fc2(x)
+
+        x = x.view(-1, _NUM_CLASSES, 3)
         return x
 
 
@@ -89,7 +101,7 @@ def _train():
 
     test_dataset = _TicTacToeDataset(transform)
 
-    model = _TicTacToeViT(_CONFIG).to(_DEVICE)
+    model = _TicTacToeViT().to(_DEVICE)
 
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
     criterion = nn.CrossEntropyLoss()
