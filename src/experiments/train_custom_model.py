@@ -169,7 +169,7 @@ def _train(use_checkpoints: bool):
             optimizer.step()
             running_loss += loss.item()
             print(
-                f"Epoch: {epoch}, Index: {index}/{_BATCHES_PER_EPOCH}, Loss: {running_loss/(index + 1)}"
+                f"Epoch: {epoch}/{_EPOCHS}, Index: {index}/{_BATCHES_PER_EPOCH}, Loss: {running_loss/(index + 1)}"
             )
 
         model.eval()
