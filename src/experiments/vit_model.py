@@ -1,3 +1,4 @@
+import argparse
 import itertools
 import logging
 import pathlib
@@ -62,17 +63,14 @@ class _TicTacToeViT(nn.Module):
             nn.ReLU(),
             nn.BatchNorm2d(32),
             nn.MaxPool2d(2),  # 112x112
-
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(64),
             nn.MaxPool2d(2),  # 56x56
-
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(128),
             nn.MaxPool2d(2),  # 28x28
-
             nn.Conv2d(128, 128, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(128),
@@ -105,6 +103,7 @@ def _save_checkpoint(
         },
         fname,
     )
+    logging.info(f"Saved checkpoint to {fname}")
 
 
 def _load_checkpoint(
@@ -113,6 +112,7 @@ def _load_checkpoint(
     checkpoint = torch.load(fname)
     model.load_state_dict(checkpoint["model_state_dict"])
     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    logging.info(f"Loaded checkpoint from {fname}")
     return checkpoint["epoch"]
 
 
@@ -139,10 +139,14 @@ def _train(use_checkpoints: bool):
     print(f"Model size: {size_in_mb:.2f} MB")
 
     start_epoch = 0
-    if use_checkpoints and _CHECKPOINT_FILE.exists():
-        logging.info(f"Checkpoint exists. Loading.")
-        start_epoch = _load_checkpoint(_CHECKPOINT_FILE, model, optimizer)
-        logging.info(f"Loaded checkpoint. Starting epoch: {start_epoch}")
+    if not use_checkpoints:
+        logging.info("Not using checkpoints.")
+    else:
+        if _CHECKPOINT_FILE.exists():
+            logging.info(f"Checkpoint exists. Loading.")
+            start_epoch = _load_checkpoint(_CHECKPOINT_FILE, model, optimizer)
+        else:
+            logging.info(f"Checkpoint does not exist. Starting from scratch.")
 
     criterion = nn.CrossEntropyLoss()
 
@@ -179,7 +183,17 @@ def _train(use_checkpoints: bool):
 
 def main():
     logging.basicConfig(level=logging.INFO)
-    _train(use_checkpoints=False)
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--no-checkpoints",
+        action="store_true",
+        default=False,
+        help="Do not use checkpoints.",
+    )
+    args = parser.parse_args()
+
+    _train(use_checkpoints=not args.no_checkpoints)
 
 
 if __name__ == "__main__":
