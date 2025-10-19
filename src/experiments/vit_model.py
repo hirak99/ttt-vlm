@@ -1,5 +1,6 @@
 import itertools
 import logging
+import random
 
 from PIL import Image
 import torch
@@ -11,7 +12,6 @@ import torchvision.transforms as transforms
 from transformers import ViTConfig
 from transformers import ViTModel
 
-from . import board_utils
 from ..ttt import board_draw
 
 from typing import Callable, Iterator
@@ -36,16 +36,17 @@ class _TicTacToeDataset(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
 
     def __iter__(self) -> Iterator[tuple[torch.Tensor, torch.Tensor]]:
         while True:
-            board = board_utils.random_board()
+            # Note: For vision training, we do not care at the moment if the position is valid.
+            board_array = [random.choice(["X", "O", "."]) for _ in range(9)]
             render_params = board_draw.RenderParams.random()
-            image: Image.Image = board_draw.to_image(board.as_array(), render_params)
+            image: Image.Image = board_draw.to_image(board_array, render_params)
             char_to_class = {
                 "X": 0,
                 "O": 1,
                 ".": 2,
             }
             label_tensor = torch.zeros((_NUM_CLASSES, 3))
-            for i, c in enumerate(board.as_array()):
+            for i, c in enumerate(board_array):
                 label_tensor[i, char_to_class[c]] = 1
             image_tensor: torch.Tensor = self._transform(image)
             yield image_tensor.to(_DEVICE), label_tensor.to(_DEVICE)
