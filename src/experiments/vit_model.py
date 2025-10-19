@@ -1,3 +1,5 @@
+import itertools
+
 from PIL import Image
 import torch
 import torch.nn as nn
@@ -8,18 +10,24 @@ import torchvision.transforms as transforms
 from transformers import ViTConfig
 from transformers import ViTModel
 
+# Size to which the image will be resized to.
 _IMAGE_SIZE = 32
+
+_NUM_CLASSES = 9
+
+_BATCH_SIZE = 32
+_SAMPLES_PER_EPOCH = 10
 
 
 class TicTacToeDataset(IterableDataset[tuple[Image.Image, torch.Tensor]]):
-    # Custom dataset for loading Tic-Tac-Toe images and labels
     def __init__(self, transform: transforms.Compose | None = None):
         self._transform = transform
 
     def __iter__(self):
         while True:
-            # yield Image.new("RGB", (32, 32)), torch.tensor([0, 0, 0, 0, 0, 0, 0, 0, 0])
-            image, label = Image.new("RGB", (32, 32)), torch.tensor(["."])
+            image, label = Image.new("RGB", (32, 32)), torch.tensor(
+                [float(x) for x in [0, 0, 0, 0, 0, 0, 0, 0, 0]]
+            )
             image = self._transform(image) if self._transform else image
             yield image, label
 
@@ -27,28 +35,22 @@ class TicTacToeDataset(IterableDataset[tuple[Image.Image, torch.Tensor]]):
 # Configuration to instantiate ViTModel.
 _CONFIG = ViTConfig(
     image_size=_IMAGE_SIZE,
-    patch_size=8,
-    num_classes=9,  # 9 output classes for Tic-Tac-Toe grid
-    dim=256,  # You can tune this
-    depth=6,  # Number of transformer layers
-    heads=8,  # Attention heads
-    mlp_dim=512,  # Feed-forward layers
 )
 
 
-# Vision Transformer Model
-class TicTacToeViT(nn.Module):
+class _TicTacToeViT(nn.Module):
     def __init__(self, config: ViTConfig):
-        super(TicTacToeViT, self).__init__()
-        self.vit = ViTModel(config)
-        self.fc = nn.Linear(
-            config.dim, 9
-        )  # 9 output classes for each cell in Tic-Tac-Toe
+        super(_TicTacToeViT, self).__init__()
+        self._vit = ViTModel(config)
+        self._fc = nn.Linear(768, _NUM_CLASSES)
 
     def forward(self, x):
-        x = self.vit(x).last_hidden_state
+        x = self._vit(x).last_hidden_state
+        # print(x.shape)  # [32, 17, 768]
         x = x.mean(dim=1)  # Global average pooling across patches
-        x = self.fc(x)  # Final classification
+        # print(x.shape)  # [32, 768]
+        x = self._fc(x)  # Final classification
+        # print(x.shape)
         return x
 
 
@@ -62,21 +64,33 @@ def main():
 
     # Example of how you'd train the model
     train_dataset = TicTacToeDataset(transform)
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=_BATCH_SIZE)
 
-    model = TicTacToeViT(_CONFIG)
+    model = _TicTacToeViT(_CONFIG)
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
     criterion = nn.CrossEntropyLoss()
 
-    # Training loop
+    # Training loop.
+    # Normally whole dataset is one epoch.
+    # However, we have infinite data. So epoch is custom.
     for epoch in range(10):  # number of epochs
         model.train()
         running_loss = 0.0
-        for images, labels in train_loader:
+        for index, (images, labels) in enumerate(
+            itertools.islice(train_loader, _SAMPLES_PER_EPOCH)
+        ):
+            print(f"Epoch: {epoch}, Index: {index}")
             optimizer.zero_grad()
             outputs = model(images)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
-        print(f"Epoch {epoch+1}, Loss: {running_loss/len(train_loader)}")
+            print(f"Epoch {epoch}, Loss: {running_loss/_SAMPLES_PER_EPOCH}")
+
+        model.eval()
+        # TODO: Can put out-of-sample evaluation code here.
+
+
+if __name__ == "__main__":
+    main()
