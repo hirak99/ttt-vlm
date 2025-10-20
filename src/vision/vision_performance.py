@@ -8,12 +8,12 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-from . import board_utils
 from .. import misc_utils
 from ..llm_service import abstract_llm
 from ..llm_service import llm_utils
 from ..llm_service import vision
 from ..ttt import board_draw
+from ..ttt import board_utils
 from ..ttt import ttt_board
 
 _RESULT_DIR = "_data/vision"

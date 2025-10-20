@@ -7,8 +7,8 @@ import time
 
 import pydantic
 
-from . import board_utils
 from . import ttt_players
+from ..ttt import board_utils
 
 _DATA_DIR = pathlib.Path("_data")
 
