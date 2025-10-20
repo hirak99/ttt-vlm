@@ -18,7 +18,7 @@ from ...ttt import board_draw
 
 from typing import Iterator
 
-_EPOCHS = 20
+_EPOCHS = 100
 _BATCHES_PER_EPOCH = 50
 _BATCH_SIZE = 32
 
