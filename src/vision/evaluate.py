@@ -144,7 +144,8 @@ def _random_eval_grid(
             grid_image.paste(eval_result.anotated_image, (x_offset, y_offset))
 
     # Write header.
-    header = f"{header}\nCorrect: {success_counter}/{sample_size}, Avg. Inference Time: {total_time / sample_size:.2f}s"
+    avg_time_ms = int(total_time / sample_size * 1000 + 0.5)
+    header = f"{header}\nCorrect: {success_counter}/{sample_size}, Avg. Inference Time: {avg_time_ms} ms"
     logging.info(f"Header: {header}")
     draw = ImageDraw.Draw(grid_image)
     font = ImageFont.truetype(misc_utils.pil_font(), size=16)
