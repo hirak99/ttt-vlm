@@ -56,11 +56,14 @@ class _TicTacToeDataset(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
                 "O": 1,
                 ".": 2,
             }
-            label_tensor = torch.zeros((custom_model.NUM_CLASSES, 3))
-            for i, c in enumerate(board_array):
-                label_tensor[i, char_to_class[c]] = 1
+            # NOTE: We are labeling as integers denoting class-ids. On this,
+            # one-hot computation will be done implicitly during loss
+            # computation.
+            class_ids = torch.tensor([char_to_class[c] for c in board_array])
+            # We could compute one-hot if we wanted and also passed that instead -
+            # onehot = F.one_hot(class_ids, 3)
             image_tensor: torch.Tensor = self._transform(image)
-            yield image_tensor.to(_DEVICE), label_tensor.to(_DEVICE)
+            yield image_tensor.to(_DEVICE), class_ids.to(_DEVICE)
 
 
 def _save_checkpoint(
@@ -148,10 +151,11 @@ def _train(use_checkpoints: bool):
             itertools.islice(train_loader, _BATCHES_PER_EPOCH)
         ):
             optimizer.zero_grad()
-            outputs = model(images)
-            # Convert this into view of [batch * 9, 3], i.e. (batch * 9) independent classes.
+            logits = model(images)
+            # Convert logits into view of [batch * 9, 3], i.e. (batch * 9) independent classes.
             # Note: We could transpose to keep dim1 as the classes. But it's simpler to just have 2 dimensions.
-            loss = criterion(outputs.view(-1, 3), labels.view(-1, 3))
+            # Also, multi-target is ambiguous for class-id.
+            loss = criterion(logits.view(-1, 3), labels.view(-1))
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
@@ -171,8 +175,8 @@ def _train(use_checkpoints: bool):
         image, label = next(iter(test_dataset))
         print(f"True Label: {label}")
         with torch.no_grad():
-            outputs = model(image.unsqueeze(0))
-        print(f"Inferred Label: {outputs}")
+            logits = model(image.unsqueeze(0))
+        print(f"Inferred Label: {logits}")
         if use_checkpoints:
             _save_checkpoint(
                 fname=_CHECKPOINT_FILE,
