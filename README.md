@@ -17,11 +17,11 @@ The two sub-goals are to have the AI -
 ### Generate Examples
 
 ```sh
-python -m src.llm_experiments.llm_generate_data --player "o3-mini"
+python -m src.gameplay.llm_generate_evaluations --player "o3-mini"
 ```
 
 ### Evaluate
-Use [chart_results](./chart_results.ipynb) to evaluate and visualize.
+Use [this notebook](./src/notebooks/gameplay_results.ipynb) to evaluate and visualize.
 
 ### Demo
 
@@ -34,7 +34,7 @@ A demo / playground for the evaluator can be served via -
 ## Vision Performance
 
 ```sh
-python -m src.experiments.vision_performance
+python -m src.vision.evaluate
 ```
 
 This will create a png grid with results.

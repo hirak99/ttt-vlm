@@ -1,6 +1,6 @@
 import os
 
-from . import llm_generate_data
+from . import llm_generate_evaluations
 from ..ttt import ttt_board
 from ..ttt import ttt_evaluator
 
@@ -14,7 +14,7 @@ class DataAnalyzer:
         self._evaluator = ttt_evaluator.TttEvaluator()
 
     def analyse(
-        self, data: llm_generate_data.PlayerResult
+        self, data: llm_generate_evaluations.PlayerResult
     ) -> tuple[ttt_evaluator.TttEvaluation, str]:
         if data.error:
             return ttt_evaluator.TttEvaluation.PARSE_ERROR, data.error
@@ -55,8 +55,8 @@ class DataAnalyzer:
         return self._evaluator.evaluate_move(data.board, data.ai_move)
 
 
-def data_iterator() -> Iterator[llm_generate_data.PlayerResult]:
+def data_iterator() -> Iterator[llm_generate_evaluations.PlayerResult]:
     for fname in os.listdir(_DATA_PATH):
         with open(os.path.join(_DATA_PATH, fname)) as f:
             for line in f:
-                yield llm_generate_data.PlayerResult.model_validate_json(line)
+                yield llm_generate_evaluations.PlayerResult.model_validate_json(line)
