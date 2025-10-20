@@ -8,10 +8,9 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
+from . import recognizers
 from .. import misc_utils
-from ..llm_service import abstract_llm
 from ..llm_service import llm_utils
-from ..llm_service import vision
 from ..ttt import board_draw
 from ..ttt import board_utils
 from ..ttt import ttt_board
@@ -20,17 +19,6 @@ _RESULT_DIR = "_data/vision"
 
 _GRID_SIZE = (128, 158)
 _MARGIN = 4
-
-_PROMPT = """
-Please identify this tic-tac-toe position.
-
-You must output a valid json of 9 characters -
-[CELL_1, CELL_2, ..., CELL_9]
-
-Each CELL_i can be ether "X", "O", or "", read in standard reading order.
-
-Output just the JSON. Do not output anything else.
-"""
 
 # If true, does not actually query the LLM.
 _SKIP_LLM_FOR_TESTS = False
@@ -41,12 +29,6 @@ class _EvalResult:
     time_taken: float
     correct: bool
     anotated_image: Image.Image
-
-
-def _ai_recognize(instance: abstract_llm.AbstractLlm, image: Image.Image) -> str:
-    return instance.do_prompt(
-        _PROMPT, max_tokens=1024, image_b64=vision.to_base64(image)
-    )
 
 
 def _result_to_image(
@@ -100,9 +82,7 @@ def _result_to_image(
     return _EvalResult(correct=correct, anotated_image=image, time_taken=time_taken)
 
 
-def _random_board_eval(
-    llm_instance: abstract_llm.AbstractLlm,
-) -> _EvalResult:
+def _random_board_eval(recognize_fn: recognizers.RecognizeFnT) -> _EvalResult:
     board = board_utils.random_board()
     logging.info(f"Random board: {board.as_array()}")
     render_params = board_draw.RenderParams.random()
@@ -112,7 +92,7 @@ def _random_board_eval(
     if _SKIP_LLM_FOR_TESTS:
         recognized = '["O", "", "O", "", "O", "X", "X", "", "X"]'
     else:
-        recognized = _ai_recognize(llm_instance, image)
+        recognized = recognize_fn(image)
     time_taken = time.time() - start_time
 
     logging.info(f"AI Output: {recognized!r}")
@@ -124,13 +104,13 @@ def _random_board_eval(
     )
 
 
-def random_eval_grid(
-    header: str, llm_instance: abstract_llm.AbstractLlm, rows: int, cols: int
+def _random_eval_grid(
+    header: str, recognize_fn: recognizers.RecognizeFnT, rows: int, cols: int
 ) -> Image.Image:
     header_height = 40
 
     # Call the test_random_board to get the size of a single board
-    eval_result = _random_board_eval(llm_instance)
+    eval_result = _random_board_eval(recognize_fn)
     board_width, board_height = eval_result.anotated_image.size
 
     # Create a new blank image large enough to hold all the boards
@@ -150,7 +130,7 @@ def random_eval_grid(
 
             # Re-use the first result for the first board, otherwise get a new eval.
             if not (row == 0 and col == 0):
-                eval_result = _random_board_eval(llm_instance)
+                eval_result = _random_board_eval(recognize_fn)
 
             if eval_result.correct:
                 success_counter += 1
@@ -181,11 +161,12 @@ def random_eval_grid(
 def main():
     logging.basicConfig(level=logging.INFO)
 
-    instance = vision.OllamaVision("blaifa/InternVL3_5:8b")
-    # instance = vision.OpenAiVision("gpt-4.1")
-    # instance = vision.OpenAiVision("o3")
+    recognizer_type = "blaifa/InternVL3_5:8b"
+    # model_type = "gpt-4.1"
+    # model_type = "o3"
+    desc, recognize_fn = recognizers.get_recognizer(recognizer_type)
 
-    image = random_eval_grid("Model: " + instance.model_description(), instance, 10, 10)
+    image = _random_eval_grid(f"Model: {desc}", recognize_fn, 10, 10)
     # Date time for file suffix.
     suffix = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     outfname = os.path.join(_RESULT_DIR, f"result_grid_{suffix}.png")
