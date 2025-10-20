@@ -83,7 +83,7 @@ def _load_checkpoint(
     checkpoint = torch.load(fname)
     model.load_state_dict(checkpoint["model_state_dict"])
     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-    epoch_stats.model_validate(checkpoint["epoch_stats"])
+    epoch_stats.root = _EpochStatsList.model_validate(checkpoint["epoch_stats"]).root
     logging.info(f"Loaded checkpoint from {fname}")
 
 
