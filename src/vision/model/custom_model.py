@@ -1,15 +1,45 @@
+import functools
 import logging
 import pathlib
 
+from PIL import Image
 import safetensors.torch
+import torch
 from torch import nn
+import torchvision.transforms as transforms
+
+from typing import Callable, override
 
 # This is the number of cells.
 # True constant - this will not change.
 NUM_CLASSES = 9
 
+# Size to which the image will be resized to.
+_IMAGE_SIZE = 224
+
 # Saved after all epochs are done.
-FINAL_MODEL_FILE = pathlib.Path("_data") / "custom_model.safetensor"
+_FINAL_MODEL_FILE = pathlib.Path("_data") / "custom_model.safetensor"
+
+CHAR_TO_CLASSID = {
+    "X": 0,
+    "O": 1,
+    ".": 2,
+}
+_CLASSID_TO_CHAR = {v: k for k, v in CHAR_TO_CLASSID.items()}
+
+
+@functools.cache
+def _get_transform() -> Callable[[Image.Image], torch.Tensor]:
+    return transforms.Compose(
+        [
+            transforms.Resize((_IMAGE_SIZE, _IMAGE_SIZE)),
+            transforms.ToTensor(),
+        ]
+    )
+
+
+def image_to_input(image: Image.Image) -> torch.Tensor:
+    return _get_transform()(image)
 
 
 class TicTacToeVision(nn.Module):
@@ -42,6 +72,7 @@ class TicTacToeVision(nn.Module):
             nn.Linear(512, NUM_CLASSES * 3),
         )
 
+    @override
     def forward(self, x):
         x = self.features(x)
         x = self.classifier(x)
@@ -49,10 +80,23 @@ class TicTacToeVision(nn.Module):
         x = x.view(-1, NUM_CLASSES, 3)
         return x
 
-    def save_savetensors(self, fname: pathlib.Path = FINAL_MODEL_FILE):
+    def recognize(self, image: Image.Image) -> list[str]:
+        image_input = image_to_input(image)
+        with torch.no_grad():
+            logits = self(image_input.unsqueeze(0))
+
+        # Argmax along the last dimension.
+        class_ids = logits.argmax(dim=-1)
+        # We have only one image in this batch.
+        assert class_ids.shape[0] == 1
+
+        class_ids_np = class_ids.cpu().numpy()
+        return [_CLASSID_TO_CHAR[class_id] for class_id in class_ids_np[0]]
+
+    def save_savetensors(self, fname: pathlib.Path = _FINAL_MODEL_FILE):
         safetensors.torch.save_file(self.state_dict(), fname)
         logging.info(f"Saved model to {fname}")
 
-    def load_safetensors(self, fname: pathlib.Path = FINAL_MODEL_FILE):
+    def load_safetensors(self, fname: pathlib.Path = _FINAL_MODEL_FILE):
         self.load_state_dict(safetensors.torch.load_file(fname))
         logging.info(f"Loaded model from {fname}")

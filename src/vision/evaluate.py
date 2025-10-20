@@ -161,9 +161,10 @@ def _random_eval_grid(
 def main():
     logging.basicConfig(level=logging.INFO)
 
-    recognizer_type = "blaifa/InternVL3_5:8b"
-    # model_type = "gpt-4.1"
-    # model_type = "o3"
+    recognizer_type = "custom_model"
+    # recognizer_type = "blaifa/InternVL3_5:8b"
+    # recognizer_type = "gpt-4.1"
+    # recognizer_type = "o3"
     desc, recognize_fn = recognizers.get_recognizer(recognizer_type)
 
     image = _random_eval_grid(f"Model: {desc}", recognize_fn, 10, 10)

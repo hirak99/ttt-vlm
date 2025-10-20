@@ -12,15 +12,11 @@ from torch import nn
 from torch import optim
 from torch.utils.data import DataLoader
 from torch.utils.data import IterableDataset
-import torchvision.transforms as transforms
 
 from . import custom_model
 from ...ttt import board_draw
 
-from typing import Callable, Iterator
-
-# Size to which the image will be resized to.
-_IMAGE_SIZE = 224
+from typing import Iterator
 
 _EPOCHS = 20
 _BATCHES_PER_EPOCH = 50
@@ -42,27 +38,21 @@ _EpochStatsList = pydantic.RootModel[list[_EpochStats]]
 
 
 class _TicTacToeDataset(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
-    def __init__(self, transform: transforms.Compose):
-        self._transform: Callable[[Image.Image], torch.Tensor] = transform
-
     def __iter__(self) -> Iterator[tuple[torch.Tensor, torch.Tensor]]:
         while True:
             # Note: For vision training, we do not care at the moment if the position is valid.
             board_array = [random.choice(["X", "O", "."]) for _ in range(9)]
             render_params = board_draw.RenderParams.random()
             image: Image.Image = board_draw.to_image(board_array, render_params)
-            char_to_class = {
-                "X": 0,
-                "O": 1,
-                ".": 2,
-            }
             # NOTE: We are labeling as integers denoting class-ids. On this,
             # one-hot computation will be done implicitly during loss
             # computation.
-            class_ids = torch.tensor([char_to_class[c] for c in board_array])
+            class_ids = torch.tensor(
+                [custom_model.CHAR_TO_CLASSID[c] for c in board_array]
+            )
             # We could compute one-hot if we wanted and also passed that instead -
             # onehot = F.one_hot(class_ids, 3)
-            image_tensor: torch.Tensor = self._transform(image)
+            image_tensor: torch.Tensor = custom_model.image_to_input(image)
             yield image_tensor.to(_DEVICE), class_ids.to(_DEVICE)
 
 
@@ -100,18 +90,11 @@ def _load_checkpoint(
 def _train(use_checkpoints: bool):
     logging.info(f"Using device: {_DEVICE}")
 
-    transform = transforms.Compose(
-        [
-            transforms.Resize((_IMAGE_SIZE, _IMAGE_SIZE)),
-            transforms.ToTensor(),
-        ]
-    )
-
     # Example of how you'd train the model
-    train_dataset = _TicTacToeDataset(transform)
+    train_dataset = _TicTacToeDataset()
     train_loader = DataLoader(train_dataset, batch_size=_BATCH_SIZE)
 
-    test_dataset = _TicTacToeDataset(transform)
+    test_dataset = _TicTacToeDataset()
 
     model = custom_model.TicTacToeVision().to(_DEVICE)
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
@@ -172,10 +155,10 @@ def _train(use_checkpoints: bool):
         model.eval()
         # TODO: Can put out-of-sample evaluation code here.
         # For now, just show one result.
-        image, label = next(iter(test_dataset))
+        image_input, label = next(iter(test_dataset))
         print(f"True Label: {label}")
         with torch.no_grad():
-            logits = model(image.unsqueeze(0))
+            logits = model(image_input.unsqueeze(0))
         print(f"Inferred Label: {logits}")
         if use_checkpoints:
             _save_checkpoint(
