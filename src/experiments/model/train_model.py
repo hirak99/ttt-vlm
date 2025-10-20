@@ -7,7 +7,6 @@ import time
 
 from PIL import Image
 import pydantic
-import safetensors.torch
 import torch
 from torch import nn
 from torch import optim
@@ -15,13 +14,10 @@ from torch.utils.data import DataLoader
 from torch.utils.data import IterableDataset
 import torchvision.transforms as transforms
 
-from ..ttt import board_draw
+from . import custom_model
+from ...ttt import board_draw
 
 from typing import Callable, Iterator
-
-# This is the number of cells.
-# True constant - this will not change.
-_NUM_CLASSES = 9
 
 # Size to which the image will be resized to.
 _IMAGE_SIZE = 224
@@ -34,8 +30,6 @@ _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Saved at the end of every epoch.
 _CHECKPOINT_FILE = pathlib.Path("_checkpoint.pth")
-# Saved after all epochs are done.
-_FINAL_MODEL_FILE = pathlib.Path("_data") / "custom_model.safetensor"
 
 
 # Custom data saved with checkpoint.
@@ -62,62 +56,16 @@ class _TicTacToeDataset(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
                 "O": 1,
                 ".": 2,
             }
-            label_tensor = torch.zeros((_NUM_CLASSES, 3))
+            label_tensor = torch.zeros((custom_model.NUM_CLASSES, 3))
             for i, c in enumerate(board_array):
                 label_tensor[i, char_to_class[c]] = 1
             image_tensor: torch.Tensor = self._transform(image)
             yield image_tensor.to(_DEVICE), label_tensor.to(_DEVICE)
 
 
-class _TicTacToeViT(nn.Module):
-    def __init__(self):
-        super(_TicTacToeViT, self).__init__()
-
-        self.features = nn.Sequential(
-            nn.Conv2d(3, 32, kernel_size=3, padding=1),  # 224x224 -> 224x224
-            nn.ReLU(),
-            nn.BatchNorm2d(32),
-            nn.MaxPool2d(2),  # 112x112
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(64),
-            nn.MaxPool2d(2),  # 56x56
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(128),
-            nn.MaxPool2d(2),  # 28x28
-            nn.Conv2d(128, 128, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(128),
-            nn.MaxPool2d(2),  # 14x14
-        )
-
-        self.classifier = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(128 * 14 * 14, 512),
-            nn.ReLU(),
-            nn.Linear(512, _NUM_CLASSES * 3),
-        )
-
-    def forward(self, x):
-        x = self.features(x)
-        x = self.classifier(x)
-
-        x = x.view(-1, _NUM_CLASSES, 3)
-        return x
-
-    def save_savetensors(self, fname: pathlib.Path):
-        safetensors.torch.save_file(self.state_dict(), fname)
-        logging.info(f"Saved model to {fname}")
-
-    def load_safetensors(self, fname: pathlib.Path):
-        self.load_state_dict(safetensors.torch.load_file(fname))
-        logging.info(f"Loaded model from {fname}")
-
-
 def _save_checkpoint(
     fname: pathlib.Path,
-    model: _TicTacToeViT,
+    model: custom_model.TicTacToeVision,
     optimizer: optim.Optimizer,
     epoch_stats: _EpochStatsList,
 ):
@@ -134,7 +82,7 @@ def _save_checkpoint(
 
 def _load_checkpoint(
     fname: pathlib.Path,
-    model: _TicTacToeViT,
+    model: custom_model.TicTacToeVision,
     optimizer: optim.Optimizer,
     epoch_stats: _EpochStatsList,
 ) -> None:
@@ -162,7 +110,7 @@ def _train(use_checkpoints: bool):
 
     test_dataset = _TicTacToeDataset(transform)
 
-    model = _TicTacToeViT().to(_DEVICE)
+    model = custom_model.TicTacToeVision().to(_DEVICE)
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
     params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -232,7 +180,7 @@ def _train(use_checkpoints: bool):
                 epoch_stats=epoch_stats,
             )
 
-    model.save_savetensors(_FINAL_MODEL_FILE)
+    model.save_savetensors()
 
 
 def main():
