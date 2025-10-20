@@ -150,6 +150,7 @@ def _train(use_checkpoints: bool):
             optimizer.zero_grad()
             outputs = model(images)
             # Convert this into view of [batch * 9, 3], i.e. (batch * 9) independent classes.
+            # Note: We could transpose to keep dim1 as the classes. But it's simpler to just have 2 dimensions.
             loss = criterion(outputs.view(-1, 3), labels.view(-1, 3))
             loss.backward()
             optimizer.step()
