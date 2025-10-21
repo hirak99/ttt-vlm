@@ -11,7 +11,7 @@ from PIL import Image
 
 from ..llm_service import abstract_llm
 from ..llm_service import vision
-from .model import models
+from .model import registry
 
 from typing import Callable
 
@@ -51,12 +51,13 @@ def get_recognizer(recognizer_type: str) -> tuple[str, RecognizeFnT]:
         - "gpt-4.1"
         - "o3"
     """
-    if recognizer_type == "cnnv1":
-        model = models.CnnV1()
+    # First check if we have a custom model by this name.
+    model = registry.get_model(recognizer_type)
+    if model is not None:
         model.load_safetensors()
         return "Custom Model", lambda image: json.dumps(model.recognize(image))
 
-    # VLM recognizers.
+    # Then check for VLM recognizers.
     if recognizer_type.startswith("gpt") or recognizer_type.startswith("o3"):
         instance = vision.OpenAiVision(recognizer_type)
     elif recognizer_type.startswith("blaifa"):

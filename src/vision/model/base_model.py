@@ -20,15 +20,15 @@ _CLASSID_TO_CHAR = {v: k for k, v in CHAR_TO_CLASSID.items()}
 
 
 class BaseModel(nn.Module, abc.ABC):
-    @classmethod
-    @abc.abstractmethod
-    def file_suffix(cls) -> str:
-        pass
 
     @classmethod
     @abc.abstractmethod
     def image_to_input(cls, image: Image.Image) -> torch.Tensor:
         pass
+
+    def __init__(self):
+        self.file_suffix: str = "unnamed"
+        super().__init__()
 
     def recognize(self, image: Image.Image) -> list[str]:
         image_input = self.image_to_input(image)
@@ -44,12 +44,11 @@ class BaseModel(nn.Module, abc.ABC):
         return [_CLASSID_TO_CHAR[class_id] for class_id in class_ids_np[0]]
 
     def save_savetensors(self):
-        fname = pathlib.Path("_data") / f"model_{self.file_suffix()}.safetensor"
+        fname = pathlib.Path("_data") / f"model_{self._file_suffix}.safetensor"
         safetensors.torch.save_file(self.state_dict(), fname)
         logging.info(f"Saved model to {fname}")
 
     def load_safetensors(self):
-        fname = pathlib.Path("_data") / f"model_{self.file_suffix()}.safetensor"
+        fname = pathlib.Path("_data") / f"model_{self._file_suffix}.safetensor"
         self.load_state_dict(safetensors.torch.load_file(fname))
         logging.info(f"Loaded model from {fname}")
-

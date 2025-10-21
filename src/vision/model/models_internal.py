@@ -1,3 +1,10 @@
+"""Custom model definitions.
+
+When you add model here, also add to the registry.
+
+Do not instantiate directly, instead use the registry.
+"""
+
 from PIL import Image
 import torch
 from torch import nn
@@ -58,10 +65,6 @@ class CnnV1(base_model.BaseModel):
         x = x.view(-1, base_model.NUM_CLASSES, 3)
         return x
 
-    @override
-    @classmethod
-    def file_suffix(cls) -> str:
-        return "cnnv1"
 
 class CnnV2(base_model.BaseModel):
     _transform: Callable[[Image.Image], torch.Tensor] = transforms.Compose(
@@ -114,8 +117,3 @@ class CnnV2(base_model.BaseModel):
 
         x = x.view(-1, base_model.NUM_CLASSES, 3)
         return x
-
-    @override
-    @classmethod
-    def file_suffix(cls) -> str:
-        return "cnnv2"

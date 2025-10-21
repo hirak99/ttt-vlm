@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data import IterableDataset
 
 from . import base_model
-from . import models
+from . import registry
 from ...ttt import board_draw
 
 from typing import Iterator
@@ -63,7 +63,7 @@ class _Trainer:
         self._model = model.to(_DEVICE)
 
         self._checkpointfile = (
-            pathlib.Path("_data") / f"_checkpoint_{self._model.file_suffix()}.pth"
+            pathlib.Path("_data") / f"_checkpoint_{self._model.file_suffix}.pth"
         )
 
     def _save_checkpoint(
@@ -187,7 +187,9 @@ def main():
     )
     args = parser.parse_args()
 
-    model = models.CnnV2()
+    model = registry.get_model("cnnv1")
+    assert model is not None
+
     trainer = _Trainer(model)
     trainer.train(use_checkpoints=not args.no_checkpoints)
 
