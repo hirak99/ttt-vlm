@@ -187,7 +187,7 @@ def main():
     )
     args = parser.parse_args()
 
-    model = models.CnnV1()
+    model = models.CnnV2()
     trainer = _Trainer(model)
     trainer.train(use_checkpoints=not args.no_checkpoints)
 
