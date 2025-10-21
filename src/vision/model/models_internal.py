@@ -88,21 +88,18 @@ class CnnV2(base_model.BaseModel):
             nn.ReLU(),
             nn.BatchNorm2d(64),
             nn.MaxPool2d(2),  # 28x28
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.BatchNorm2d(128),
+            nn.BatchNorm2d(64),
             nn.MaxPool2d(2),  # 14x14
-            nn.Conv2d(128, 128, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(128),
-            nn.MaxPool2d(2),  # 7x7
+            nn.Conv2d(64, 32, kernel_size=3, padding=1),
         )
 
         self.classifier = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(128 * 7 * 7, 512),
+            nn.Linear(32 * 14 * 14, 256),
             nn.ReLU(),
-            nn.Linear(512, base_model.NUM_CLASSES * 3),
+            nn.Linear(256, base_model.NUM_CLASSES * 3),
         )
 
     @override

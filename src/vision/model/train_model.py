@@ -187,7 +187,7 @@ def main():
     )
     args = parser.parse_args()
 
-    model = registry.get_model("cnnv1")
+    model = registry.get_model("cnnv2")
     assert model is not None
 
     trainer = _Trainer(model)
