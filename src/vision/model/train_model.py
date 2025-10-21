@@ -13,7 +13,8 @@ from torch import optim
 from torch.utils.data import DataLoader
 from torch.utils.data import IterableDataset
 
-from . import custom_model
+from . import base_model
+from . import models
 from ...ttt import board_draw
 
 from typing import Iterator
@@ -35,7 +36,7 @@ _EpochStatsList = pydantic.RootModel[list[_EpochStats]]
 
 
 class _ModelDataset(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
-    def __init__(self, model_class: custom_model.BaseModel):
+    def __init__(self, model_class: base_model.BaseModel):
         super().__init__()
         self._model_class = model_class.__class__
 
@@ -51,14 +52,14 @@ class _ModelDataset(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
             # We could compute one-hot if we wanted and also passed that instead -
             # onehot = F.one_hot(class_ids, 3)
             class_ids = torch.tensor(
-                [custom_model.CHAR_TO_CLASSID[c] for c in board_array]
+                [base_model.CHAR_TO_CLASSID[c] for c in board_array]
             )
             image_input = self._model_class.image_to_input(image)
             yield image_input.to(_DEVICE), class_ids.to(_DEVICE)
 
 
 class _Trainer:
-    def __init__(self, model: custom_model.BaseModel):
+    def __init__(self, model: base_model.BaseModel):
         self._model = model.to(_DEVICE)
 
         self._checkpointfile = (
@@ -186,7 +187,7 @@ def main():
     )
     args = parser.parse_args()
 
-    model = custom_model.CnnV1()
+    model = models.CnnV1()
     trainer = _Trainer(model)
     trainer.train(use_checkpoints=not args.no_checkpoints)
 

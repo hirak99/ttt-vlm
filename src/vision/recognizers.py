@@ -11,7 +11,7 @@ from PIL import Image
 
 from ..llm_service import abstract_llm
 from ..llm_service import vision
-from .model import custom_model
+from .model import models
 
 from typing import Callable
 
@@ -52,7 +52,7 @@ def get_recognizer(recognizer_type: str) -> tuple[str, RecognizeFnT]:
         - "o3"
     """
     if recognizer_type == "cnnv1":
-        model = custom_model.CnnV1()
+        model = models.CnnV1()
         model.load_safetensors()
         return "Custom Model", lambda image: json.dumps(model.recognize(image))
 
