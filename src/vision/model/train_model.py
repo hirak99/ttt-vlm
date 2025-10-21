@@ -24,9 +24,6 @@ _BATCH_SIZE = 32
 
 _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Saved at the end of every epoch.
-_CHECKPOINT_FILE = pathlib.Path("_checkpoint.pth")
-
 
 # Custom data saved with checkpoint.
 class _EpochStats(pydantic.BaseModel):
@@ -37,7 +34,11 @@ class _EpochStats(pydantic.BaseModel):
 _EpochStatsList = pydantic.RootModel[list[_EpochStats]]
 
 
-class _TicTacToeDataset(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
+class _ModelDataset(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
+    def __init__(self, model_class: custom_model.BaseModel):
+        super().__init__()
+        self._model_class = model_class.__class__
+
     def __iter__(self) -> Iterator[tuple[torch.Tensor, torch.Tensor]]:
         while True:
             # Note: For vision training, we do not care at the moment if the position is valid.
@@ -47,128 +48,130 @@ class _TicTacToeDataset(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
             # NOTE: We are labeling as integers denoting class-ids. On this,
             # one-hot computation will be done implicitly during loss
             # computation.
+            # We could compute one-hot if we wanted and also passed that instead -
+            # onehot = F.one_hot(class_ids, 3)
             class_ids = torch.tensor(
                 [custom_model.CHAR_TO_CLASSID[c] for c in board_array]
             )
-            # We could compute one-hot if we wanted and also passed that instead -
-            # onehot = F.one_hot(class_ids, 3)
-            image_tensor: torch.Tensor = custom_model.image_to_input(image)
-            yield image_tensor.to(_DEVICE), class_ids.to(_DEVICE)
+            image_input = self._model_class.image_to_input(image)
+            yield image_input.to(_DEVICE), class_ids.to(_DEVICE)
 
 
-def _save_checkpoint(
-    fname: pathlib.Path,
-    model: custom_model.TicTacToeVision,
-    optimizer: optim.Optimizer,
-    epoch_stats: _EpochStatsList,
-):
-    torch.save(
-        {
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "epoch_stats": epoch_stats.model_dump(),
-        },
-        fname,
-    )
-    logging.info(f"Saved checkpoint to {fname}")
+class _Trainer:
+    def __init__(self, model: custom_model.BaseModel):
+        self._model = model.to(_DEVICE)
 
-
-def _load_checkpoint(
-    fname: pathlib.Path,
-    model: custom_model.TicTacToeVision,
-    optimizer: optim.Optimizer,
-    epoch_stats: _EpochStatsList,
-) -> None:
-    """Returns training time."""
-    checkpoint = torch.load(fname)
-    model.load_state_dict(checkpoint["model_state_dict"])
-    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-    epoch_stats.root = _EpochStatsList.model_validate(checkpoint["epoch_stats"]).root
-    logging.info(f"Loaded checkpoint from {fname}")
-
-
-def _train(use_checkpoints: bool):
-    logging.info(f"Using device: {_DEVICE}")
-
-    # Example of how you'd train the model
-    train_dataset = _TicTacToeDataset()
-    train_loader = DataLoader(train_dataset, batch_size=_BATCH_SIZE)
-
-    test_dataset = _TicTacToeDataset()
-
-    model = custom_model.TicTacToeVision().to(_DEVICE)
-    optimizer = optim.Adam(model.parameters(), lr=1e-4)
-
-    params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Model has {params:_} parameters.")
-    size_in_mb = params * 4 / 1024 / 1024
-    print(f"Model size: {size_in_mb:.2f} MB")
-
-    epoch_stats = _EpochStatsList([])
-
-    if not use_checkpoints:
-        logging.info("Not using checkpoints.")
-    else:
-        if _CHECKPOINT_FILE.exists():
-            logging.info(f"Checkpoint exists. Loading.")
-            start_epoch = _load_checkpoint(
-                fname=_CHECKPOINT_FILE,
-                model=model,
-                optimizer=optimizer,
-                epoch_stats=epoch_stats,
-            )
-        else:
-            logging.info(f"Checkpoint does not exist. Starting from scratch.")
-
-    criterion = nn.CrossEntropyLoss()
-
-    # Training loop.
-    start_epoch = len(epoch_stats.root)
-    for epoch in range(start_epoch, _EPOCHS):  # number of epochs
-        model.train()
-        running_loss = 0.0
-        start_time = time.time()
-        # Normally whole dataset is one epoch.
-        # However, we have infinite data. So we arbitrarily define epoch size.
-        for index, (images, labels) in enumerate(
-            itertools.islice(train_loader, _BATCHES_PER_EPOCH)
-        ):
-            optimizer.zero_grad()
-            logits = model(images)
-            # Convert logits into view of [batch * 9, 3], i.e. (batch * 9) independent classes.
-            # Note: We could transpose to keep dim1 as the classes. But it's simpler to just have 2 dimensions.
-            # Also, multi-target is ambiguous for class-id.
-            loss = criterion(logits.view(-1, 3), labels.view(-1))
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()
-            print(
-                f"Epoch: {epoch}/{_EPOCHS}, Index: {index}/{_BATCHES_PER_EPOCH}, Avg. Loss this epoch: {running_loss/(index + 1)}"
-            )
-
-        epoch_time = time.time() - start_time
-
-        epoch_stats.root.append(
-            _EpochStats(duration=epoch_time, loss=running_loss / _BATCHES_PER_EPOCH)
+        self._checkpointfile = (
+            pathlib.Path("_data") / f"_checkpoint_{self._model.file_suffix()}.pth"
         )
 
-        model.eval()
-        # TODO: Can put out-of-sample evaluation code here.
-        # For now, just show one result.
-        image_input, label = next(iter(test_dataset))
-        print(f"True Label: {label}")
-        with torch.no_grad():
-            logits = model(image_input.unsqueeze(0))
-        print(f"Inferred Label: {logits}")
-        if use_checkpoints:
-            _save_checkpoint(
-                fname=_CHECKPOINT_FILE,
-                model=model,
-                optimizer=optimizer,
-                epoch_stats=epoch_stats,
+    def _save_checkpoint(
+        self,
+        optimizer: optim.Optimizer,
+        epoch_stats: _EpochStatsList,
+    ):
+        torch.save(
+            {
+                "model_state_dict": self._model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "epoch_stats": epoch_stats.model_dump(),
+            },
+            self._checkpointfile,
+        )
+        logging.info(f"Saved checkpoint to {self._checkpointfile}")
+
+    def _load_checkpoint(
+        self,
+        optimizer: optim.Optimizer,
+        epoch_stats: _EpochStatsList,
+    ) -> None:
+        """Returns training time."""
+        checkpoint = torch.load(self._checkpointfile)
+        self._model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        epoch_stats.root = _EpochStatsList.model_validate(
+            checkpoint["epoch_stats"]
+        ).root
+        logging.info(f"Loaded checkpoint from {self._checkpointfile}")
+
+    def train(self, use_checkpoints: bool):
+        logging.info(f"Using device: {_DEVICE}")
+
+        train_dataset = _ModelDataset(self._model)
+        train_loader = DataLoader(train_dataset, batch_size=_BATCH_SIZE)
+
+        test_dataset = _ModelDataset(self._model)
+
+        optimizer = optim.Adam(self._model.parameters(), lr=1e-4)
+
+        params = sum(p.numel() for p in self._model.parameters() if p.requires_grad)
+        print(f"Model has {params:_} parameters.")
+        size_in_mb = params * 4 / 1024 / 1024
+        print(f"Model size: {size_in_mb:.2f} MB")
+
+        epoch_stats = _EpochStatsList([])
+
+        if not use_checkpoints:
+            logging.info("Not using checkpoints.")
+        else:
+            if self._checkpointfile.exists():
+                logging.info(f"Checkpoint ({self._checkpointfile!r}) exists. Loading.")
+                start_epoch = self._load_checkpoint(
+                    optimizer=optimizer,
+                    epoch_stats=epoch_stats,
+                )
+            else:
+                logging.info(
+                    f"Checkpoint ({self._checkpointfile!r}) does not exist. Starting from scratch."
+                )
+
+        criterion = nn.CrossEntropyLoss()
+
+        # Training loop.
+        start_epoch = len(epoch_stats.root)
+        for epoch in range(start_epoch, _EPOCHS):  # number of epochs
+            self._model.train()
+            running_loss = 0.0
+            start_time = time.time()
+            # Normally whole dataset is one epoch.
+            # However, we have infinite data. So we arbitrarily define epoch size.
+            for index, (images, labels) in enumerate(
+                itertools.islice(train_loader, _BATCHES_PER_EPOCH)
+            ):
+                optimizer.zero_grad()
+                logits = self._model(images)
+                # Convert logits into view of [batch * 9, 3], i.e. (batch * 9) independent classes.
+                # Note: We could transpose to keep dim1 as the classes. But it's simpler to just have 2 dimensions.
+                # Also, multi-target is ambiguous for class-id.
+                loss = criterion(logits.view(-1, 3), labels.view(-1))
+                loss.backward()
+                optimizer.step()
+                running_loss += loss.item()
+                print(
+                    f"Epoch: {epoch}/{_EPOCHS}, Index: {index}/{_BATCHES_PER_EPOCH}, Avg. Loss this epoch: {running_loss/(index + 1)}"
+                )
+
+            epoch_time = time.time() - start_time
+
+            epoch_stats.root.append(
+                _EpochStats(duration=epoch_time, loss=running_loss / _BATCHES_PER_EPOCH)
             )
 
-    model.save_savetensors()
+            self._model.eval()
+            # TODO: Can put out-of-sample evaluation code here.
+            # For now, just show one result.
+            image_input, label = next(iter(test_dataset))
+            print(f"True Label: {label}")
+            with torch.no_grad():
+                logits = self._model(image_input.unsqueeze(0))
+            print(f"Inferred Label: {logits}")
+            if use_checkpoints:
+                self._save_checkpoint(
+                    optimizer=optimizer,
+                    epoch_stats=epoch_stats,
+                )
+
+        self._model.save_savetensors()
 
 
 def main():
@@ -183,7 +186,9 @@ def main():
     )
     args = parser.parse_args()
 
-    _train(use_checkpoints=not args.no_checkpoints)
+    model = custom_model.CnnV1()
+    trainer = _Trainer(model)
+    trainer.train(use_checkpoints=not args.no_checkpoints)
 
 
 if __name__ == "__main__":

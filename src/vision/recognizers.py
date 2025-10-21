@@ -51,8 +51,8 @@ def get_recognizer(recognizer_type: str) -> tuple[str, RecognizeFnT]:
         - "gpt-4.1"
         - "o3"
     """
-    if recognizer_type == "custom_model":
-        model = custom_model.TicTacToeVision()
+    if recognizer_type == "cnnv1":
+        model = custom_model.CnnV1()
         model.load_safetensors()
         return "Custom Model", lambda image: json.dumps(model.recognize(image))
 
