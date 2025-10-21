@@ -172,7 +172,7 @@ class _Trainer:
                     epoch_stats=epoch_stats,
                 )
 
-        self._model.save_savetensors()
+        self._model.save_savetensor()
 
 
 def main():

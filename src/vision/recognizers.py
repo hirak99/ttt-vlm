@@ -54,7 +54,7 @@ def get_recognizer(recognizer_type: str) -> tuple[str, RecognizeFnT]:
     # First check if we have a custom model by this name.
     model = registry.get_model(recognizer_type)
     if model is not None:
-        model.load_safetensors()
+        model.load_safetensor()
         return "Custom Model", lambda image: json.dumps(model.recognize(image))
 
     # Then check for VLM recognizers.
