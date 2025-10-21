@@ -35,7 +35,7 @@ class _EpochStats(pydantic.BaseModel):
 _EpochStatsList = pydantic.RootModel[list[_EpochStats]]
 
 
-class _ModelDataset(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
+class _IterableData(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
     def __init__(self, model_class: base_model.BaseModel):
         super().__init__()
         self._model_class = model_class.__class__
@@ -56,6 +56,25 @@ class _ModelDataset(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
             )
             image_input = self._model_class.image_to_input(image)
             yield image_input.to(_DEVICE), class_ids.to(_DEVICE)
+
+
+# Possible definition of dataset without iteration. This may help to speed up
+# training by reducing CPU work per cycle.
+#
+# class _InMemoryData(Dataset[tuple[torch.Tensor, torch.Tensor]]):
+#     def __init__(self, model_class: base_model.BaseModel, length: int) -> None:
+#         super().__init__()
+#         self._iterable = iter(_IterableData(model_class))
+#         self._data = list[tuple[torch.Tensor, torch.Tensor]](self._iterable)
+#         self._length = length
+#
+#     def __len__(self) -> int:
+#         return self._length
+#
+#     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+#         while len(self._data) < index + 1:
+#             self._data.append(next(self._iterable))
+#         return self._data[index]
 
 
 class _Trainer:
@@ -98,10 +117,10 @@ class _Trainer:
     def train(self, use_checkpoints: bool):
         logging.info(f"Using device: {_DEVICE}")
 
-        train_dataset = _ModelDataset(self._model)
+        train_dataset = _IterableData(self._model)
         train_loader = DataLoader(train_dataset, batch_size=_BATCH_SIZE)
 
-        test_dataset = _ModelDataset(self._model)
+        test_dataset = _IterableData(self._model)
 
         optimizer = optim.Adam(self._model.parameters(), lr=1e-4)
 
