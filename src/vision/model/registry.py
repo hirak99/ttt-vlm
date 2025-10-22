@@ -3,15 +3,16 @@ from . import models_internal
 
 from typing import Type
 
-# Change this to select the default for convenience.
-# Used in training, evaluation, etc.
-DEFAULT_MODEL_NAME: str = "cnnv2"
+# For convenience, this serves as the default model used in training,
+# evaluation, etc.
+DEFAULT_MODEL_NAME: str = "cnnv3"
 
 
-_REGISTRY: dict[str, Type[base_model.BaseModel]] = {
-    "cnnv1": models_internal.CnnV1,
-    "cnnv2": models_internal.CnnV2,
-}
+# Can add one off models here.
+_REGISTRY: dict[str, Type[base_model.BaseModel]] = {}
+
+# Add models defined in other modules to the registry.
+_REGISTRY.update(models_internal.for_registry())
 
 
 def get_model(model_name: str) -> base_model.BaseModel | None:
