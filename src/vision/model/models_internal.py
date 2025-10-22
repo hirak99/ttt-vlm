@@ -69,7 +69,7 @@ class CnnV1(base_model.BaseModel):
 class CnnV2(base_model.BaseModel):
     _transform: Callable[[Image.Image], torch.Tensor] = transforms.Compose(
         [
-            transforms.Resize((224, 224)),
+            transforms.Resize((128, 128)),
             transforms.ToTensor(),
         ]
     )
@@ -80,26 +80,25 @@ class CnnV2(base_model.BaseModel):
         self.features = nn.Sequential(
             # New Size = floor of:
             # (input_size + 2 * padding - kernel_size) / stride + 1
-            nn.Conv2d(3, 32, kernel_size=5, stride=2, padding=2),  # 224x224 -> 112x112
+            nn.Conv2d(3, 32, kernel_size=3, padding=1),  # 128x128 -> 128x128
             nn.ReLU(),
             nn.BatchNorm2d(32),
-            nn.MaxPool2d(2),  # 56x56
+            nn.MaxPool2d(2),  # 64x64
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(64),
-            nn.MaxPool2d(2),  # 28x28
-            nn.Conv2d(64, 64, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(64),
-            nn.MaxPool2d(2),  # 14x14
+            nn.MaxPool2d(2),  # 32x32
             nn.Conv2d(64, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(32),
+            nn.MaxPool2d(2),  # 16x16
         )
 
         self.classifier = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(32 * 14 * 14, 256),
+            nn.Linear(32 * 16 * 16, 128),
             nn.ReLU(),
-            nn.Linear(256, base_model.NUM_CLASSES * 3),
+            nn.Linear(128, base_model.NUM_CLASSES * 3),
         )
 
     @override
