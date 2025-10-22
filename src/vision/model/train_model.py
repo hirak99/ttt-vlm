@@ -147,9 +147,10 @@ class _Trainer:
         ).root
         for index, epoch_stat in enumerate(epoch_stats.root):
             # logging.info(f"Loss at epoch {index}: {epoch_stat.loss}")
-            logging.info(
-                f"Epoch {index}: Accuracy = {epoch_stat.correct_boards / epoch_stat.total_boards * 100:.2f}%"
-            )
+            tally = _Tally()
+            tally.correct = epoch_stat.correct_boards
+            tally.total = epoch_stat.total_boards
+            logging.info(f"Epoch {index}: Loss {epoch_stat.loss:.6f}, {tally.status()}")
         logging.info(f"Loaded checkpoint from {self._checkpointfile}")
 
     def train(self, use_checkpoints: bool):
@@ -223,7 +224,7 @@ class _Trainer:
                 print(
                     f"Epoch: {epoch}/{_EPOCHS},"
                     f" Index: {index}/{_BATCHES_PER_EPOCH},"
-                    f" This epoch - Loss = {running_loss/(index + 1):0.6f},"
+                    f" This epoch - Loss {running_loss/(index + 1):.6f},"
                     f" {tally.status()}"
                 )
 
