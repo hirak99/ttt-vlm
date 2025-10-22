@@ -88,12 +88,14 @@ class _Trainer:
     def _save_checkpoint(
         self,
         optimizer: optim.Optimizer,
+        scheduler: optim.lr_scheduler.ReduceLROnPlateau,
         epoch_stats: _EpochStatsList,
     ):
         torch.save(
             {
                 "model_state_dict": self._model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
+                "scheduler_state_dict": scheduler.state_dict(),
                 "epoch_stats": epoch_stats.model_dump(),
             },
             self._checkpointfile,
@@ -103,12 +105,16 @@ class _Trainer:
     def _load_checkpoint(
         self,
         optimizer: optim.Optimizer,
+        scheduler: optim.lr_scheduler.ReduceLROnPlateau,
         epoch_stats: _EpochStatsList,
     ) -> None:
         """Returns training time."""
         checkpoint = torch.load(self._checkpointfile)
         self._model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        # Some earlier models were trained without a scheduler.
+        if "scheduler_state_dict" in checkpoint:
+            scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
         epoch_stats.root = _EpochStatsList.model_validate(
             checkpoint["epoch_stats"]
         ).root
@@ -126,6 +132,17 @@ class _Trainer:
 
         optimizer = optim.Adam(self._model.parameters(), lr=1e-4)
 
+        # Initialize the Scheduler
+        # 'mode'='min' means it monitors a loss (e.g., validation loss) and reduces LR if it stops decreasing.
+        # 'factor'=0.5 means it will cut the LR by half (e.g., 1e-4 -> 5e-5).
+        # 'patience'=15 means it will wait 15 epochs without improvement before reducing the LR.
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode="min",
+            factor=0.5,
+            patience=15,
+        )
+
         params = sum(p.numel() for p in self._model.parameters() if p.requires_grad)
         print(f"Model has {params:_} parameters.")
         size_in_mb = params * 4 / 1024 / 1024
@@ -140,6 +157,7 @@ class _Trainer:
                 logging.info(f"Checkpoint ({self._checkpointfile!r}) exists. Loading.")
                 start_epoch = self._load_checkpoint(
                     optimizer=optimizer,
+                    scheduler=scheduler,
                     epoch_stats=epoch_stats,
                 )
             else:
@@ -154,6 +172,7 @@ class _Trainer:
         for epoch in range(start_epoch, _EPOCHS):  # number of epochs
             self._model.train()
             running_loss = 0.0
+            print(f"Current LR: {optimizer.param_groups[0]['lr']}")
             start_time = time.time()
             # Normally whole dataset is one epoch.
             # However, we have infinite data. So we arbitrarily define epoch size.
@@ -173,6 +192,8 @@ class _Trainer:
                     f"Epoch: {epoch}/{_EPOCHS}, Index: {index}/{_BATCHES_PER_EPOCH}, Avg. Loss this epoch: {running_loss/(index + 1)}"
                 )
 
+            scheduler.step(running_loss)
+
             epoch_time = time.time() - start_time
 
             epoch_stats.root.append(
@@ -190,6 +211,7 @@ class _Trainer:
             if use_checkpoints:
                 self._save_checkpoint(
                     optimizer=optimizer,
+                    scheduler=scheduler,
                     epoch_stats=epoch_stats,
                 )
 
