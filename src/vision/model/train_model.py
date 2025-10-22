@@ -113,6 +113,8 @@ class _Trainer:
             checkpoint["epoch_stats"]
         ).root
         logging.info(f"Loaded checkpoint from {self._checkpointfile}")
+        for index, epoch_stat in enumerate(epoch_stats.root):
+            logging.info(f"Loss at epoch {index}: {epoch_stat.loss}")
 
     def train(self, use_checkpoints: bool):
         logging.info(f"Using device: {_DEVICE}")
@@ -206,7 +208,7 @@ def main():
     )
     args = parser.parse_args()
 
-    model = registry.get_model("cnnv2")
+    model = registry.default_model()
     assert model is not None
 
     trainer = _Trainer(model)

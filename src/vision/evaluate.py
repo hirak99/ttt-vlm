@@ -14,6 +14,7 @@ from ..llm_service import llm_utils
 from ..ttt import board_draw
 from ..ttt import board_utils
 from ..ttt import ttt_board
+from .model import registry
 
 _RESULT_DIR = "_data/vision"
 
@@ -162,7 +163,7 @@ def _random_eval_grid(
 def main():
     logging.basicConfig(level=logging.INFO)
 
-    recognizer_type = "custom_model"
+    recognizer_type = registry.DEFAULT_MODEL_NAME
     # recognizer_type = "blaifa/InternVL3_5:8b"
     # recognizer_type = "gpt-4.1"
     # recognizer_type = "o3"
