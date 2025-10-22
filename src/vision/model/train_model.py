@@ -16,6 +16,7 @@ from torch.utils.data import IterableDataset
 from . import base_model
 from . import registry
 from ...ttt import board_draw
+from ...ttt import board_utils
 
 from typing import Iterator
 
@@ -44,8 +45,13 @@ class _IterableData(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
 
     def __iter__(self) -> Iterator[tuple[torch.Tensor, torch.Tensor]]:
         while True:
-            # Note: For vision training, we do not care at the moment if the position is valid.
-            board_array = [random.choice(["X", "O", "."]) for _ in range(9)]
+            if random.random() < 0.5:
+                # Correct board.
+                board = board_utils.random_board()
+                board_array = board.as_array()
+            else:
+                # Any board, including invalid positions.
+                board_array = [random.choice(["X", "O", "."]) for _ in range(9)]
             render_params = board_draw.RenderParams.random()
             image: Image.Image = board_draw.to_image(board_array, render_params)
             # NOTE: We are labeling as integers denoting class-ids. On this,
