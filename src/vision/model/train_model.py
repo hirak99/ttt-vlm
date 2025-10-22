@@ -28,6 +28,8 @@ _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Custom data saved with checkpoint.
 class _EpochStats(pydantic.BaseModel):
+    total_boards: int
+    correct_boards: int
     duration: float
     loss: float
 
@@ -77,6 +79,22 @@ class _IterableData(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
 #         return self._data[index]
 
 
+class _Tally:
+    def __init__(self):
+        self.correct: int = 0
+        self.total: int = 0
+
+    def update(self, logits: torch.Tensor, labels: torch.Tensor):
+        # Argmax along the last dimension.
+        class_ids = logits.argmax(dim=-1)
+        self.total += labels.shape[0]
+        # An item is correct, if all labels in it are correct.
+        self.correct += int((class_ids == labels).all(dim=-1).sum().item() + 0.5)
+
+    def status(self) -> str:
+        return f"Correct {self.correct}/{self.total} = {self.correct / self.total * 100:.2f}%"
+
+
 class _Trainer:
     def __init__(self, model: base_model.BaseModel):
         self._model = model.to(_DEVICE)
@@ -118,9 +136,12 @@ class _Trainer:
         epoch_stats.root = _EpochStatsList.model_validate(
             checkpoint["epoch_stats"]
         ).root
-        logging.info(f"Loaded checkpoint from {self._checkpointfile}")
         for index, epoch_stat in enumerate(epoch_stats.root):
-            logging.info(f"Loss at epoch {index}: {epoch_stat.loss}")
+            # logging.info(f"Loss at epoch {index}: {epoch_stat.loss}")
+            logging.info(
+                f"Epoch {index}: Accuracy = {epoch_stat.correct_boards / epoch_stat.total_boards * 100:.2f}%"
+            )
+        logging.info(f"Loaded checkpoint from {self._checkpointfile}")
 
     def train(self, use_checkpoints: bool):
         logging.info(f"Using device: {_DEVICE}")
@@ -173,6 +194,7 @@ class _Trainer:
             self._model.train()
             running_loss = 0.0
             print(f"Current LR: {optimizer.param_groups[0]['lr']}")
+            tally = _Tally()
             start_time = time.time()
             # Normally whole dataset is one epoch.
             # However, we have infinite data. So we arbitrarily define epoch size.
@@ -181,6 +203,7 @@ class _Trainer:
             ):
                 optimizer.zero_grad()
                 logits = self._model(images)
+                tally.update(logits, labels)
                 # Convert logits into view of [batch * 9, 3], i.e. (batch * 9) independent classes.
                 # Note: We could transpose to keep dim1 as the classes. But it's simpler to just have 2 dimensions.
                 # Also, multi-target is ambiguous for class-id.
@@ -189,7 +212,10 @@ class _Trainer:
                 optimizer.step()
                 running_loss += loss.item()
                 print(
-                    f"Epoch: {epoch}/{_EPOCHS}, Index: {index}/{_BATCHES_PER_EPOCH}, Avg. Loss this epoch: {running_loss/(index + 1)}"
+                    f"Epoch: {epoch}/{_EPOCHS},"
+                    f" Index: {index}/{_BATCHES_PER_EPOCH},"
+                    f" This epoch - Loss = {running_loss/(index + 1):0.6f},"
+                    f" {tally.status()}"
                 )
 
             scheduler.step(running_loss)
@@ -197,7 +223,12 @@ class _Trainer:
             epoch_time = time.time() - start_time
 
             epoch_stats.root.append(
-                _EpochStats(duration=epoch_time, loss=running_loss / _BATCHES_PER_EPOCH)
+                _EpochStats(
+                    duration=epoch_time,
+                    loss=running_loss / _BATCHES_PER_EPOCH,
+                    total_boards=tally.total,
+                    correct_boards=tally.correct,
+                )
             )
 
             self._model.eval()
