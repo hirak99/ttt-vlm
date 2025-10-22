@@ -16,7 +16,6 @@ from torch.utils.data import IterableDataset
 from . import base_model
 from . import registry
 from ...ttt import board_draw
-from ...ttt import board_utils
 
 from typing import Iterator
 
@@ -45,13 +44,17 @@ class _IterableData(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
 
     def __iter__(self) -> Iterator[tuple[torch.Tensor, torch.Tensor]]:
         while True:
-            if random.random() < 0.5:
-                # Correct board.
-                board = board_utils.random_board()
-                board_array = board.as_array()
-            else:
-                # Any board, including invalid positions.
-                board_array = [random.choice(["X", "O", "."]) for _ in range(9)]
+            # Equally select 0-9 filled cells. This matches real life
+            # distribution of empty cells.
+            board_array = ["."] * 9
+            fill_count = random.randint(0, 9)
+            filled_indices = random.sample(range(9), fill_count)
+            # Then fill the cells randomly. Yes, many such boards may be
+            # invalid. We won't condition on valid boards just yet. This way, we
+            # can detect invalid boards correctly.
+            for index in filled_indices:
+                board_array[index] = random.choice(["X", "O"])
+
             render_params = board_draw.RenderParams.random()
             image: Image.Image = board_draw.to_image(board_array, render_params)
             # NOTE: We are labeling as integers denoting class-ids. On this,
