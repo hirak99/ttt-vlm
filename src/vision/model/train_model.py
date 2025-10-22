@@ -265,9 +265,12 @@ def main():
         default=False,
         help="Do not use checkpoints.",
     )
+    parser.add_argument(
+        "--model", type=str, default=registry.DEFAULT_MODEL_NAME, help="Model to use."
+    )
     args = parser.parse_args()
 
-    model = registry.default_model()
+    model = registry.get_model(args.model)
     assert model is not None
 
     trainer = _Trainer(model)
