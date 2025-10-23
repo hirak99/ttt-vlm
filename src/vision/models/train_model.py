@@ -17,6 +17,7 @@ from torch.utils.data import IterableDataset
 from . import base_model
 from . import registry
 from ...ttt import board_draw
+from ...utils import torch_utils
 
 from typing import Iterator
 
@@ -35,7 +36,8 @@ class _EpochStats(pydantic.BaseModel):
     loss: float
 
 
-_EpochStatsList = pydantic.RootModel[list[_EpochStats]]
+# Public since this can be used in Notebooks.
+EpochStatsList = pydantic.RootModel[list[_EpochStats]]
 
 
 class _IterableData(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
@@ -122,7 +124,7 @@ class _Trainer:
         self,
         optimizer: optim.Optimizer,
         scheduler: optim.lr_scheduler.ReduceLROnPlateau,
-        epoch_stats: _EpochStatsList,
+        epoch_stats: EpochStatsList,
     ):
         os.makedirs(self._checkpointfile.parent, exist_ok=True)
         torch.save(
@@ -143,7 +145,7 @@ class _Trainer:
         self,
         optimizer: optim.Optimizer,
         scheduler: optim.lr_scheduler.ReduceLROnPlateau,
-        epoch_stats: _EpochStatsList,
+        epoch_stats: EpochStatsList,
     ) -> None:
         """Returns training time."""
         checkpoint = torch.load(self._checkpointfile)
@@ -152,9 +154,7 @@ class _Trainer:
         # Some earlier models were trained without a scheduler.
         if "scheduler_state_dict" in checkpoint:
             scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-        epoch_stats.root = _EpochStatsList.model_validate(
-            checkpoint["epoch_stats"]
-        ).root
+        epoch_stats.root = EpochStatsList.model_validate(checkpoint["epoch_stats"]).root
         for index, epoch_stat in enumerate(epoch_stats.root):
             # logging.info(f"Loss at epoch {index}: {epoch_stat.loss}")
             tally = _Tally()
@@ -163,7 +163,7 @@ class _Trainer:
             logging.info(f"Epoch {index}: Loss {epoch_stat.loss:.6f}, {tally.status()}")
         if os.path.exists(self._statsfile):
             with open(self._statsfile, "r") as f:
-                epoch_stats.root = _EpochStatsList.model_validate_json(f.read()).root
+                epoch_stats.root = EpochStatsList.model_validate_json(f.read()).root
                 logging.info(f"Loaded stats from {self._statsfile}.")
         logging.info(f"Loaded checkpoint from {self._checkpointfile}")
 
@@ -188,12 +188,13 @@ class _Trainer:
             patience=15,
         )
 
-        params = sum(p.numel() for p in self._model.parameters() if p.requires_grad)
-        print(f"Model has {params:_} parameters.")
-        size_in_mb = params * 4 / 1024 / 1024
-        print(f"Model size: {size_in_mb:.2f} MB")
+        model_size = torch_utils.get_model_size(self._model)
 
-        epoch_stats = _EpochStatsList([])
+        # Show number of params and size in MB.
+        print(f"Model has {model_size.parameters:_} parameters.")
+        print(f"Model size: {model_size.size_in_mb:.2f} MB")
+
+        epoch_stats = EpochStatsList([])
 
         if not use_checkpoints:
             logging.info("Not using checkpoints.")
@@ -289,7 +290,6 @@ def main():
     args = parser.parse_args()
 
     model = registry.get_model(args.model)
-    assert model is not None
 
     trainer = _Trainer(model)
     trainer.train(use_checkpoints=not args.no_checkpoints)

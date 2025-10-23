@@ -15,9 +15,13 @@ _REGISTRY: dict[str, Type[base_model.BaseModel]] = {}
 _REGISTRY.update(models_internal.for_registry())
 
 
-def get_model(model_name: str) -> base_model.BaseModel | None:
+class ModelNotFoundError(Exception):
+    pass
+
+
+def get_model(model_name: str) -> base_model.BaseModel:
     if model_name not in _REGISTRY:
-        return None
+        raise ModelNotFoundError(f"Unknown model: {model_name}")
     model = _REGISTRY[model_name]()
     model.file_suffix = model_name
     return model

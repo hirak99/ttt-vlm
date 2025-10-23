@@ -180,7 +180,7 @@ class _CnnV3(base_model.BaseModel):
 
 def for_registry() -> dict[str, Type[base_model.BaseModel]]:
     return {
-        "cnnv1": _CnnV1,  # ~85-95% accuracy.
-        "cnnv2": _CnnV2,  # ~90-95% accuracy.
+        "cnnv1": _CnnV1,
+        "cnnv2": _CnnV2,
         "cnnv3": _CnnV3,
     }

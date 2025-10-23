@@ -52,12 +52,14 @@ def get_recognizer(recognizer_type: str) -> tuple[str, RecognizeFnT]:
         - "o3"
     """
     # First check if we have a custom model by this name.
-    model = registry.get_model(recognizer_type)
-    if model is not None:
+    try:
+        model = registry.get_model(recognizer_type)
         model.load_safetensor()
         return f"Custom: {recognizer_type}", lambda image: json.dumps(
             model.recognize(image)
         )
+    except registry.ModelNotFoundError:
+        pass
 
     # Then check for VLM recognizers.
     if recognizer_type.startswith("gpt") or recognizer_type.startswith("o3"):
