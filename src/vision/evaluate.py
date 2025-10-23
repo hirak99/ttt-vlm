@@ -1,3 +1,4 @@
+import argparse
 import dataclasses
 import datetime
 import logging
@@ -163,11 +164,17 @@ def _random_eval_grid(
 def main():
     logging.basicConfig(level=logging.INFO)
 
-    recognizer_type = registry.DEFAULT_MODEL_NAME
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--model", type=str, default=registry.DEFAULT_MODEL_NAME, help="Model to use."
+    )
+    args = parser.parse_args()
+
+    # recognizer_type = registry.DEFAULT_MODEL_NAME
     # recognizer_type = "blaifa/InternVL3_5:8b"
     # recognizer_type = "gpt-4.1"
     # recognizer_type = "o3"
-    desc, recognize_fn = recognizers.get_recognizer(recognizer_type)
+    desc, recognize_fn = recognizers.get_recognizer(recognizer_type=args.model)
 
     image = _random_eval_grid(f"Model: {desc}", recognize_fn, 10, 10)
     # Date time for file suffix.
