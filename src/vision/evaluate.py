@@ -15,7 +15,7 @@ from ..llm_service import llm_utils
 from ..ttt import board_draw
 from ..ttt import board_utils
 from ..ttt import ttt_board
-from .model import registry
+from .models import registry
 
 _RESULT_DIR = "_data/vision"
 

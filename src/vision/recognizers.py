@@ -11,7 +11,7 @@ from PIL import Image
 
 from ..llm_service import abstract_llm
 from ..llm_service import vision
-from .model import registry
+from .models import registry
 
 from typing import Callable
 
