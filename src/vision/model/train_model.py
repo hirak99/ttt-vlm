@@ -1,6 +1,7 @@
 import argparse
 import itertools
 import logging
+import os
 import pathlib
 import random
 import time
@@ -111,6 +112,9 @@ class _Trainer:
         self._checkpointfile = (
             pathlib.Path("_data") / f"_checkpoint_{self._model.file_suffix}.pth"
         )
+        self._statsfile = (
+            pathlib.Path("_data") / "vision" / f"_stats_{self._model.file_suffix}.json"
+        )
 
     def _save_checkpoint(
         self,
@@ -127,7 +131,10 @@ class _Trainer:
             },
             self._checkpointfile,
         )
-        logging.info(f"Saved checkpoint to {self._checkpointfile}")
+        logging.info(f"Saved checkpoint to {self._checkpointfile}.")
+        with open(self._statsfile, "w") as f:
+            f.write(epoch_stats.model_dump_json())
+            logging.info(f"Saved stats also to {self._statsfile}.")
 
     def _load_checkpoint(
         self,
@@ -151,6 +158,10 @@ class _Trainer:
             tally.correct = epoch_stat.correct_boards
             tally.total = epoch_stat.total_boards
             logging.info(f"Epoch {index}: Loss {epoch_stat.loss:.6f}, {tally.status()}")
+        if os.path.exists(self._statsfile):
+            with open(self._statsfile, "r") as f:
+                epoch_stats.root = _EpochStatsList.model_validate_json(f.read()).root
+                logging.info(f"Loaded stats from {self._statsfile}.")
         logging.info(f"Loaded checkpoint from {self._checkpointfile}")
 
     def train(self, use_checkpoints: bool):
