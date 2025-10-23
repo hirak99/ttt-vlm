@@ -110,7 +110,9 @@ class _Trainer:
         self._model = model.to(_DEVICE)
 
         self._checkpointfile = (
-            pathlib.Path("_data") / f"_checkpoint_{self._model.file_suffix}.pth"
+            pathlib.Path("_data")
+            / "vision"
+            / f"_checkpoint_{self._model.file_suffix}.pth"
         )
         self._statsfile = (
             pathlib.Path("_data") / "vision" / f"_stats_{self._model.file_suffix}.json"
@@ -122,6 +124,7 @@ class _Trainer:
         scheduler: optim.lr_scheduler.ReduceLROnPlateau,
         epoch_stats: _EpochStatsList,
     ):
+        os.makedirs(self._checkpointfile.parent, exist_ok=True)
         torch.save(
             {
                 "model_state_dict": self._model.state_dict(),
